@@ -12,7 +12,7 @@ end
 
 class ChinoAPI
     
-    attr_accessor :applications
+    attr_accessor :applications, :auth
     
     def initialize(customer_id, customer_key, host_url)
         check_string(customer_id)
@@ -21,7 +21,8 @@ class ChinoAPI
         @customer_id = customer_id
         @customer_key = customer_key
         @host_url = host_url
-        @applications = Applications.new()
+        @applications = Applications.new(@customer_id, @customer_key)
+        @auth = Auth.new(@customer_id, @customer_key)
     end
     
     def check_string(value)
@@ -30,18 +31,8 @@ class ChinoAPI
         end
     end
     
-    def self.do_http(uri, request)
-        http = Net::HTTP.new(uri.host, uri.port)
-    end
-
-    def build_auth_header(token)
-        header = 'Bearer '+token
-        header
-    end
-
-    def build_auth_header(customer_id, customer_key)
-        header = Base64.encode64(consumer_id+":"+customer_key)
-        header
+    def initUser()
+        
     end
 end
 
@@ -67,11 +58,12 @@ end
 
 class ChinoBaseAPI < CheckValues
 
-    def initialize
-        #@customer_id = "Bearer "
-        #@customer_key = ""
-        @customer_id = "<your-customer-id>"
-        @customer_key = "<your-customer-key>"
+    def initialize(customer_id, customer_key)
+        if customer_id == ""
+            @customer_id = "Bearer "
+        end
+        @customer_id = customer_id
+        @customer_key = customer_key
     end
 
     def return_uri_with_params(path, limit, offset)
@@ -90,7 +82,11 @@ class ChinoBaseAPI < CheckValues
         check_string(path)
         uri = return_uri(path)
         req = Net::HTTP::Get.new(uri.path)
-        req.basic_auth @customer_id, @customer_key
+        if @customer_id == "Bearer "
+            req.add_field("Authorization", @customer_id+@customer_key)
+        else
+            req.basic_auth @customer_id, @customer_key
+        end
         res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
             http.request(req)
         }
@@ -101,7 +97,11 @@ class ChinoBaseAPI < CheckValues
         check_string(path)
         uri = return_uri_with_params(path, limit, offset)
         req = Net::HTTP::Get.new(uri)
-        req.basic_auth @customer_id, @customer_key
+        if @customer_id == "Bearer "
+            req.add_field("Authorization", @customer_id+@customer_key)
+            else
+            req.basic_auth @customer_id, @customer_key
+        end
         res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
             http.request(req)
         }
@@ -111,7 +111,11 @@ class ChinoBaseAPI < CheckValues
     def post_resource(path, data)
         uri = return_uri(path)
         req = Net::HTTP::Post.new(uri.path)
-        req.basic_auth @customer_id, @customer_key
+        if @customer_id == "Bearer "
+            req.add_field("Authorization", @customer_id+@customer_key)
+            else
+            req.basic_auth @customer_id, @customer_key
+        end
         req.body = data
         res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
             http.request(req)
@@ -122,7 +126,11 @@ class ChinoBaseAPI < CheckValues
     def put_resource(path, data)
         uri = return_uri(path)
         req = Net::HTTP::Put.new(uri.path)
-        req.basic_auth @customer_id, @customer_key
+        if @customer_id == "Bearer "
+            req.add_field("Authorization", @customer_id+@customer_key)
+            else
+            req.basic_auth @customer_id, @customer_key
+        end
         req.body = data
         res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
             http.request(req)
@@ -139,7 +147,11 @@ class ChinoBaseAPI < CheckValues
             uri = return_uri(path)
         end
         req = Net::HTTP::Delete.new(uri.path)
-        req.basic_auth @customer_id, @customer_key
+        if @customer_id == "Bearer "
+            req.add_field("Authorization", @customer_id+@customer_key)
+            else
+            req.basic_auth @customer_id, @customer_key
+        end
         res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
             http.request(req)
         }
@@ -314,6 +326,92 @@ class Applications < ChinoBaseAPI
     end
 end
 
+#------------------------------AUTH-----------------------------------#
+
+class LoggedUser
+    include ActiveModel::Serializers::JSON
+    
+    attr_accessor :access_token, :token_type, :expires_in, :refresh_token, :scope
+    
+    def attributes=(hash)
+        hash.each do |key, value|
+            send("#{key}=", value)
+        end
+    end
+    
+    def attributes
+        instance_values
+    end
+end
+
+class Auth < ChinoBaseAPI
+    
+    def loginWithPassword(username, password, application_id, application_secret)
+        check_string(username)
+        check_string(password)
+        check_string(application_id)
+        check_string(application_secret)
+        uri = return_uri("/auth/token/")
+        req = Net::HTTP::Post.new(uri.path)
+        req.basic_auth application_id, application_secret
+        req.set_form_data([["username", username], ["password", password], ["grant_type", "password"]])
+        res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
+            http.request(req)
+        }
+        usr = LoggedUser.new
+        usr.from_json((parse_response(res)['data']).to_json)
+        usr
+    end
+    
+    def loginWithAuthenticationCode(code, redirect_url, application_id, application_secret)
+        check_string(code)
+        check_string(redirect_url)
+        check_string(application_id)
+        check_string(application_secret)
+        uri = return_uri("/auth/token/")
+        req = Net::HTTP::Post.new(uri.path)
+        req.basic_auth application_id, application_secret
+        req.set_form_data([["code", code], ["redirect_uri", redirect_url], ["grant_type", "authorization_code"], ["scope", "read write"], ["client_id", application_id], ["client_secret", application_secret]])
+        res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
+            http.request(req)
+        }
+        usr = LoggedUser.new
+        usr.from_json((parse_response(res)['data']).to_json)
+        usr
+    end
+   
+   def refreshToken(refresh_token, application_id, application_secret)
+       check_string(refresh_token)
+       check_string(application_id)
+       check_string(application_secret)
+       uri = return_uri("/auth/token/")
+       req = Net::HTTP::Post.new(uri.path)
+       req.basic_auth application_id, application_secret
+       req.set_form_data([["refresh_token", refresh_token], ["client_id", application_id], ["client_secret", application_secret], ["grant_type", "refresh_token"]])
+       res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
+           http.request(req)
+       }
+       usr = LoggedUser.new
+       usr.from_json((parse_response(res)['data']).to_json)
+       usr
+    end
+   
+   def logout(token, application_id, application_secret)
+       check_string(token)
+       check_string(application_id)
+       check_string(application_secret)
+       uri = return_uri("/auth/revoke_token/")
+       req = Net::HTTP::Post.new(uri.path)
+       req.basic_auth application_id, application_secret
+       req.set_form_data([["token", token], ["client_id", application_id], ["client_secret", application_secret]])
+       res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
+           http.request(req)
+       }
+       parse_response(res)['result']
+
+   end
+end
+
 #------------------------------USER SCHEMAS-----------------------------------#
 
 class UserSchema
@@ -442,6 +540,21 @@ if __FILE__ == $0
     puts app.app_name + " " + app.app_id
     app = chinoAPI.applications.update_application(app.app_id, "test_creation_ruby_updated", "password", "")
     puts app.app_name + " " + app.app_id
+    
+    usr = chinoAPI.auth.loginWithPassword("testUsernames", "testPassword", app.app_id, app.app_secret)
+    puts usr.access_token + " " + usr.token_type
+    
+    usr = chinoAPI.auth.refreshToken(usr.refresh_token, app.app_id, app.app_secret)
+    puts usr.access_token + " " + usr.token_type
+    
+    chinoAPI = ChinoAPI.new("Bearer ", usr.access_token, url)
+    
+    #chinoAPI.applications.create_application("test_creation_ruby", "password", "")
+    
+    puts chinoAPI.auth.logout(usr.access_token, app.app_id, app.app_secret)
+    
+    chinoAPI = ChinoAPI.new(customer_id, customer_key, url)
+    
     apps = chinoAPI.applications.list_applications()
     puts "count: #{apps.count}"
     apps.applications.each do |a|
