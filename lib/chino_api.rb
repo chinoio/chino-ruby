@@ -1643,13 +1643,11 @@ end
 #------------------------------RUNNING CODE-----------------------------------#
 
 if __FILE__ == $0
-    url = "https://kube.chino.io/v1"
-    customer_id = "8ce0030c-d5f5-43cf-9e63-c654507bbfea"
-    customer_key = "c40274f3-e8e4-4ff3-8c71-34e0bce3fc9b"
+    url = "https://api.test.chino.io/v1"
+    customer_id = "<your-customer-id>"
+    customer_key = "<your-customer-key>"
 
-#    url = "https://api.test.chino.io/v1"
-#    customer_id = "9e4ed528-4c14-4691-9108-31e173ed7dd7"
-#    customer_key = "a53d3ece-af44-449c-99fd-af5472d10675"
+
 
     chinoAPI = ChinoAPI.new(customer_id, customer_key, url)
     
