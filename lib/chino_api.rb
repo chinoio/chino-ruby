@@ -5,14 +5,12 @@ require "active_model"
 require "json"
 
 module Chino
-    API_TEST_SERVER = "https://api.test.chino.io/v1"
-    API_SERVER = "https://api.chino.io/v1"
     QUERY_DEFAULT_LIMIT = 100
 end
 
 class ChinoAPI
     
-    attr_accessor :applications, :auth, :repositories, :schemas, :documents, :user_schemas, :users, :groups, :collections, :permissions
+    attr_accessor :applications, :auth, :repositories, :schemas, :documents, :user_schemas, :users, :groups, :collections, :permissions, :search
     
     def initialize(customer_id, customer_key, host_url)
         check_string(customer_id)
@@ -21,16 +19,17 @@ class ChinoAPI
         @customer_id = customer_id
         @customer_key = customer_key
         @host_url = host_url
-        @applications = Applications.new(@customer_id, @customer_key)
-        @auth = Auth.new(@customer_id, @customer_key)
-        @repositories = Repositories.new(@customer_id, @customer_key)
-        @schemas = Schemas.new(@customer_id, @customer_key)
-        @documents = Documents.new(@customer_id, @customer_key)
-        @user_schemas = UserSchemas.new(@customer_id, @customer_key)
-        @users = Users.new(@customer_id, @customer_key)
-        @groups = Groups.new(@customer_id, @customer_key)
-        @collections = Collections.new(@customer_id, @customer_key)
-        @permissions = Permissions.new(@customer_id, @customer_key)
+        @applications = Applications.new(@customer_id, @customer_key, @host_url)
+        @auth = Auth.new(@customer_id, @customer_key, @host_url)
+        @repositories = Repositories.new(@customer_id, @customer_key, @host_url)
+        @schemas = Schemas.new(@customer_id, @customer_key, @host_url)
+        @documents = Documents.new(@customer_id, @customer_key, @host_url)
+        @user_schemas = UserSchemas.new(@customer_id, @customer_key, @host_url)
+        @users = Users.new(@customer_id, @customer_key, @host_url)
+        @groups = Groups.new(@customer_id, @customer_key, @host_url)
+        @collections = Collections.new(@customer_id, @customer_key, @host_url)
+        @permissions = Permissions.new(@customer_id, @customer_key, @host_url)
+        @search = Search.new(@customer_id, @customer_key, @host_url)
     end
     
     def check_string(value)
@@ -89,28 +88,31 @@ end
 
 class ChinoBaseAPI < CheckValues
 
-    def initialize(customer_id, customer_key)
+    def initialize(customer_id, customer_key, host_url)
         if customer_id == ""
             @customer_id = "Bearer "
         end
         @customer_id = customer_id
         @customer_key = customer_key
+        @host_url = host_url
     end
 
     def return_uri_with_params(path, limit, offset)
-        uri = URI(Chino::API_TEST_SERVER+path+"?limit=#{limit}&offset=#{offset}")
+        uri = URI(@host_url+path)
+        params = { "limit" => limit, :"offset" => offset}
+        uri.query = URI.encode_www_form(params)
         uri
     end
     
     def return_uri_full_document(path, limit, offset)
-        uri = URI(Chino::API_TEST_SERVER+path+"?full_document=true&limit=#{limit}&offset=#{offset}")
+        uri = URI(@host_url+path)
+        params = { :"full_document" => true, :"limit" => limit, :"offset" => offset}
+        uri.query = URI.encode_www_form(params)
         uri
     end
     
     def return_uri(path)
-        uri = URI(Chino::API_TEST_SERVER+path)
-        params = { :"Content-Type" => "application/json"}
-        uri.query = URI.encode_www_form(params)
+        uri = URI(@host_url+path)
         uri
     end
     
@@ -161,6 +163,21 @@ class ChinoBaseAPI < CheckValues
     
     def post_resource(path, data)
         uri = return_uri(path)
+        req = Net::HTTP::Post.new(uri.path)
+        if @customer_id == "Bearer "
+            req.add_field("Authorization", @customer_id+@customer_key)
+            else
+            req.basic_auth @customer_id, @customer_key
+        end
+        req.body = data
+        res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
+            http.request(req)
+        }
+        parse_response(res)['data']
+    end
+    
+    def post_resource_with_params(path, data, limit, offset)
+        uri = return_uri_with_params(path, limit, offset)
         req = Net::HTTP::Post.new(uri.path)
         if @customer_id == "Bearer "
             req.add_field("Authorization", @customer_id+@customer_key)
@@ -241,7 +258,7 @@ class ChinoBaseAPI < CheckValues
         else
             uri = return_uri(path)
         end
-        req = Net::HTTP::Delete.new(uri.path)
+        req = Net::HTTP::Delete.new(uri)
         if @customer_id == "Bearer "
             req.add_field("Authorization", @customer_id+@customer_key)
             else
@@ -586,10 +603,14 @@ class Repositories < ChinoBaseAPI
         repo
     end
     
-    def update_repository(repository_id, description)
+    def update_repository(repository_id, description, is_active=nil)
         check_string(repository_id)
         check_string(description)
-        data = {"description": description}.to_json
+        if is_active.nil?
+            data = {"description": description}.to_json
+        else
+            data = {"description": description, "is_active": is_active}.to_json
+        end
         repo = Repository.new
         repo.from_json(put_resource("/repositories/#{repository_id}", data).to_json, true)
         repo
@@ -1032,11 +1053,15 @@ class Schemas < ChinoBaseAPI
         schema
     end
 
-    def update_schema(schema_id, description, fields)
+    def update_schema(schema_id, description, fields, is_active=nil)
         check_string(schema_id)
         check_string(description)
         check_json(fields)
-        data = {"description": description, "structure": { "fields": fields}}.to_json
+        if is_active.nil?
+            data = {"description": description, "structure": { "fields": fields}}.to_json
+        else
+            data = {"description": description, "structure": { "fields": fields}, "is_active": is_active}.to_json
+        end
         schema = Schema.new
         schema.from_json(put_resource("/schemas/#{schema_id}", data).to_json, true)
         schema
@@ -1143,10 +1168,14 @@ class Documents < ChinoBaseAPI
         document
     end
     
-    def update_document(document_id, content)
+    def update_document(document_id, content, is_active=nil)
         check_string(document_id)
         check_json(content)
-        data = {"content": content}.to_json
+        if is_active.nil?
+            data = {"content": content}.to_json
+        else
+            data = {"content": content, "is_active": is_active}.to_json
+        end
         puts data
         document = Document.new
         document.from_json(put_resource("/documents/#{document_id}", data).to_json, true)
@@ -1499,15 +1528,182 @@ class Permissions < ChinoBaseAPI
 
 end
 
+#------------------------------SEARCH-----------------------------------#
+
+class FilterOption < CheckValues
+    attr_accessor :field, :type, :value
+    
+    def initialize(field, type, value)
+        check_string(field)
+        check_string(type)
+        check_json(value)
+        self.field = field
+        self.type = type
+        self.value = value
+    end
+    
+    def to_json
+        return {"field": field, "type": type, "value": value}.to_json
+    end
+end
+
+class SortOption < CheckValues
+    attr_accessor :field, :order
+    
+    def initialize(field, order)
+        check_string(field)
+        check_string(order)
+        self.field = field
+        self.order = order
+    end
+    
+    def to_json
+        return {"field": field, "order": order}.to_json
+    end
+end
+
+class Search < ChinoBaseAPI
+    def search_documents(schema_id, result_type, filter_type, sort, filter)
+        check_string(schema_id)
+        check_string(result_type)
+        check_string(filter_type)
+        check_json(sort)
+        check_json(filter)
+        data = {"result_type": result_type, "filter_type": filter_type, "filter": filter, "sort": sort}.to_json
+        docs = GetDocumentsResponse.new
+        docs.from_json(post_resource_with_params("/search/documents/#{schema_id}", data, Chino::QUERY_DEFAULT_LIMIT, 0).to_json)
+        ds = docs.documents
+        docs.documents = []
+        ds.each do |d|
+            doc = Document.new
+            doc.from_json(d.to_json)
+            docs.documents.push(doc)
+        end
+        docs
+    end
+    
+    def search_documents_with_params(schema_id, result_type, filter_type, sort, filter, limit, offset)
+        check_string(schema_id)
+        check_string(result_type)
+        check_string(filter_type)
+        check_json(sort)
+        check_json(filter)
+        data = {"result_type": result_type, "filter_type": filter_type, "filter": filter, "sort": sort}.to_json
+        docs = GetDocumentsResponse.new
+        docs.from_json(post_resource_with_params("/search/documents/#{schema_id}", data, limit, offset).to_json)
+        ds = docs.documents
+        docs.documents = []
+        ds.each do |d|
+            doc = Document.new
+            doc.from_json(d.to_json)
+            docs.documents.push(doc)
+        end
+        docs
+    end
+    
+    def search_users(user_schema_id, result_type, filter_type, sort, filter)
+        check_string(user_schema_id)
+        check_string(result_type)
+        check_string(filter_type)
+        check_json(sort)
+        check_json(filter)
+        data = {"result_type": result_type, "filter_type": filter_type, "filter": filter, "sort": sort}.to_json
+        users = GetUsersResponse.new
+        users.from_json(post_resource_with_params("/search/users/#{user_schema_id}", data, Chino::QUERY_DEFAULT_LIMIT, 0).to_json)
+        us = users.users
+        users.users = []
+        us.each do |u|
+            user = User.new
+            user.from_json(u.to_json)
+            users.users.push(user)
+        end
+        users
+    end
+    
+    def search_users_with_params(user_schema_id, result_type, filter_type, sort, filter, limit, offset)
+        check_string(user_schema_id)
+        check_string(result_type)
+        check_string(filter_type)
+        check_json(sort)
+        check_json(filter)
+        data = {"result_type": result_type, "filter_type": filter_type, "filter": filter, "sort": sort}.to_json
+        users = GetUsersResponse.new
+        users.from_json(post_resource_with_params("/search/users/#{user_schema_id}", data, limit, offset).to_json)
+        us = users.users
+        users.users = []
+        us.each do |u|
+            user = User.new
+            user.from_json(u.to_json)
+            users.users.push(user)
+        end
+        users
+    end
+end
+
 #------------------------------RUNNING CODE-----------------------------------#
 
 if __FILE__ == $0
-    client_token = "z4EEfL45DUHmtq1AZ1F7h73AKJejX2"
-    url = "https://api.test.chino.io/v1"
-    customer_id = "<your-customer-id>"
-    customer_key = "<your-customer-key>"
+    url = "https://kube.chino.io/v1"
+    customer_id = "8ce0030c-d5f5-43cf-9e63-c654507bbfea"
+    customer_key = "c40274f3-e8e4-4ff3-8c71-34e0bce3fc9b"
+
+#    url = "https://api.test.chino.io/v1"
+#    customer_id = "9e4ed528-4c14-4691-9108-31e173ed7dd7"
+#    customer_key = "a53d3ece-af44-449c-99fd-af5472d10675"
+
     chinoAPI = ChinoAPI.new(customer_id, customer_key, url)
     
+    #-------------------ACTIVE ALL------------------------#
+    
+#    repos = chinoAPI.repositories.list_repositories()
+#    repos.repositories.each do |r|
+#        chinoAPI.repositories.update_repository(r.repository_id, r.description, true)
+#        schemas = chinoAPI.schemas.list_schemas(r.repository_id)
+#        schemas.schemas.each do |s|
+#            chinoAPI.schemas.update_schema(s.schema_id, s.description, s.getFields(), true)
+#            docs = chinoAPI.documents.list_documents(s.schema_id, true)
+#            docs.documents.each do |d|
+#                chinoAPI.documents.update_document(d.document_id, d.content, true)
+#            end
+#        end
+#    end
+#    
+#    #-------------------DELETE ALL------------------------#
+#    
+#    puts "DELETE ALL"
+#    
+#    schemas = chinoAPI.user_schemas.list_user_schemas()
+#    schemas.user_schemas.each do |s|
+#        users = chinoAPI.users.list_users(s.user_schema_id)
+#        users.users.each do |u|
+#            puts chinoAPI.users.delete_user(u.user_id, true)
+#        end
+#        puts chinoAPI.user_schemas.delete_user_schema(s.user_schema_id, true)
+#    end
+#    
+#    repos = chinoAPI.repositories.list_repositories()
+#    repos.repositories.each do |r|
+#        schemas = chinoAPI.schemas.list_schemas(r.repository_id)
+#        schemas.schemas.each do |s|
+#            docs = chinoAPI.documents.list_documents(s.schema_id, true)
+#            docs.documents.each do |d|
+#                puts chinoAPI.documents.delete_document(d.document_id, true)
+#            end
+#            puts chinoAPI.schemas.delete_schema(s.schema_id, true)
+#        end
+#        puts chinoAPI.repositories.delete_repository(r.repository_id, true)
+#    end
+#    
+#    cols = chinoAPI.collections.list_collections()
+#    cols.collections.each do |c|
+#        puts chinoAPI.collections.delete_collection(c.collection_id, true)
+#    end
+#    
+#    groups = chinoAPI.groups.list_groups()
+#    groups.groups.each do |g|
+#        puts chinoAPI.groups.delete_group(g.group_id, true)
+#    end
+
     #-------------------APPLICATIONS AND AUTH------------------------#
     
     puts "APPLICATIONS AND AUTH"
@@ -1549,7 +1745,7 @@ if __FILE__ == $0
     
     fields = []
     fields.push(Field.new("string", "test_string", true))
-    fields.push(Field.new("integer", "test_integer", false))
+    fields.push(Field.new("integer", "test_integer", true))
     
     u_schema = chinoAPI.user_schemas.create_user_schema("test-user-schema-description-ruby", fields)
     puts u_schema.description + " " + u_schema.user_schema_id
@@ -1565,6 +1761,8 @@ if __FILE__ == $0
         puts s.description + " " + s.user_schema_id
         puts s.getFields.to_s
     end
+    
+    sleep(3)
     
     #-------------------USERS------------------------#
     
@@ -1627,7 +1825,7 @@ if __FILE__ == $0
     puts group.group_name + ": " + group.group_id
     puts "attributes: " + group.group_attributes.to_s
     
-    groups = chinoAPI.groups.list_groups()
+    groups = chinoAPI.groups.list_groups_with_params(100, 0)
     puts "count: #{groups.count}"
     groups.groups.each do |g|
         puts g.group_name + ": " + g.group_id
@@ -1671,7 +1869,7 @@ if __FILE__ == $0
     
     fields = []
     fields.push(Field.new("string", "test_string", true))
-    fields.push(Field.new("integer", "test_integer", false))
+    fields.push(Field.new("integer", "test_integer", true))
     
     schema = chinoAPI.schemas.create_schema(repo.repository_id, "test-schema-description-ruby", fields)
     puts schema.description + " " + schema.schema_id
@@ -1687,6 +1885,8 @@ if __FILE__ == $0
         puts s.description + " " + s.schema_id
         puts schema.getFields.to_s
     end
+    
+    sleep(3)
     
     #-------------------DOCUMENTS------------------------#
     
@@ -1762,6 +1962,8 @@ if __FILE__ == $0
     
     #-------------------PERMISSIONS------------------------#
     
+    puts "PERMISSIONS"
+    
     puts chinoAPI.permissions.permissions_on_resources("grant", "repositories", "users", usr.user_id, ["R", "U"], ["R"])
     
     perms = chinoAPI.permissions.read_permissions_of_a_user(usr.user_id)
@@ -1782,6 +1984,38 @@ if __FILE__ == $0
         puts "resource_id: " + p.resource_id.to_s
         puts "resource_type: " + p.resource_type.to_s
         puts "permission: " + p.permission.to_s
+    end
+    
+    #-------------------SEARCH------------------------#
+    
+    puts "SEARCH"
+    
+    sort = []
+    sort.push(SortOption.new("test_string", "asc"))
+    
+    filter = []
+    filter.push(FilterOption.new("test_string", "eq", "sample value ruby"))
+    filter.push(FilterOption.new("test_integer", "eq", 1233))
+    
+    docs = chinoAPI.search.search_documents(schema.schema_id, "FULL_CONTENT", "and", sort, filter)
+    puts "count: #{docs.count}"
+    docs.documents.each do |d|
+        puts d.document_id
+        puts d.content
+    end
+    
+    sort = []
+    sort.push(SortOption.new("test_string", "asc"))
+    
+    filter = []
+    filter.push(FilterOption.new("test_string", "eq", "sample value ruby"))
+    filter.push(FilterOption.new("test_integer", "eq", 666))
+    
+    users = chinoAPI.search.search_users(u_schema.user_schema_id, "FULL_CONTENT", "and", sort, filter)
+    puts "count: #{users.count}"
+    users.users.each do |u|
+        puts u.user_id
+        puts "attributes: " + u.user_attributes.to_s
     end
     
     puts "Delete group: " + chinoAPI.groups.delete_group(group.group_id, true)
