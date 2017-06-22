@@ -1,0 +1,9 @@
+development:
+    url: https://api.test.chino.io/v1
+    customer_id: <your-customer-id>
+    customer_key: <your-customer-key>
+
+production:
+    url: https://api.chino.io/v1
+    customer_id: <your-customer-id>
+    customer_key: <your-customer-key>

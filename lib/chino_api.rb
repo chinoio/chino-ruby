@@ -3,6 +3,7 @@ require "uri"
 require "net/https"
 require "active_model"
 require "json"
+require "yaml"
 
 module Chino
     QUERY_DEFAULT_LIMIT = 100
@@ -1643,13 +1644,13 @@ end
 #------------------------------RUNNING CODE-----------------------------------#
 
 if __FILE__ == $0
-    url = "https://api.test.chino.io/v1"
-    customer_id = "<your-customer-id>"
-    customer_key = "<your-customer-key>"
+    
+    RAILS_ROOT = File.join(File.dirname(__FILE__), '../')
+    KEYS = YAML::load(File.open("#{RAILS_ROOT}/config/config-chino.yml"))
 
+    DEVELOPMENT_KEYS = KEYS['development']
 
-
-    chinoAPI = ChinoAPI.new(customer_id, customer_key, url)
+    chinoAPI = ChinoAPI.new(DEVELOPMENT_KEYS['customer_id'], DEVELOPMENT_KEYS['customer_key'], DEVELOPMENT_KEYS['url'])
     
     #-------------------ACTIVE ALL------------------------#
     
