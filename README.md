@@ -1,24 +1,12 @@
-# README
+#  CHINO.io Ruby client #
+*Official* Ruby wrapper for **CHINO.io** API,
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+Docs are available [here](http://docs.chino.io)
 
-Things you may want to cover:
+###Currently under development
 
-* Ruby version
+To try the SDK put your credentials in the config/config-chino.yml and than run the following command
 
-* System dependencies
+`ruby lib/chino_api.rb`
 
-* Configuration
-
-* Database creation
-
-* Database initialization
-
-* How to run the test suite
-
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
+NOTE: Do not use your production keys to test the SDK!

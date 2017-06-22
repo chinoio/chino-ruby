@@ -1648,6 +1648,7 @@ if __FILE__ == $0
     RAILS_ROOT = File.join(File.dirname(__FILE__), '../')
     KEYS = YAML::load(File.open("#{RAILS_ROOT}/config/config-chino.yml"))
 
+#    DEVELOPMENT_KEYS = KEYS['development_old']
     DEVELOPMENT_KEYS = KEYS['development']
 
     chinoAPI = ChinoAPI.new(DEVELOPMENT_KEYS['customer_id'], DEVELOPMENT_KEYS['customer_key'], DEVELOPMENT_KEYS['url'])
