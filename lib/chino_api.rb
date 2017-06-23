@@ -4,6 +4,7 @@ require "net/https"
 require "active_model"
 require "json"
 require "yaml"
+require "digest"
 
 module Chino
     QUERY_DEFAULT_LIMIT = 100
@@ -11,7 +12,7 @@ end
 
 class ChinoAPI
     
-    attr_accessor :applications, :auth, :repositories, :schemas, :documents, :user_schemas, :users, :groups, :collections, :permissions, :search
+    attr_accessor :applications, :auth, :repositories, :schemas, :documents, :user_schemas, :users, :groups, :collections, :permissions, :search, :blobs
     
     def initialize(customer_id, customer_key, host_url)
         check_string(customer_id)
@@ -31,6 +32,7 @@ class ChinoAPI
         @collections = Collections.new(@customer_id, @customer_key, @host_url)
         @permissions = Permissions.new(@customer_id, @customer_key, @host_url)
         @search = Search.new(@customer_id, @customer_key, @host_url)
+        @blobs = Blobs.new(@customer_id, @customer_key, @host_url)
     end
     
     def check_string(value)
@@ -343,7 +345,7 @@ end
 class Application
     include ActiveModel::Serializers::JSON
     
-    attr_accessor :app_name, :app_id, :app_secret, :grant_type, :redirect_url
+    attr_accessor :app_name, :app_id, :app_secret, :grant_type, :redirect_url, :client_type
     
     def attributes=(hash)
         hash.each do |key, value|
@@ -1641,6 +1643,170 @@ class Search < ChinoBaseAPI
     end
 end
 
+#------------------------------BLOBS-----------------------------------#
+
+class InitBlobResponse < CheckValues
+    include ActiveModel::Serializers::JSON
+    
+    attr_accessor :upload_id, :expire_date, :offset
+    
+    def attributes=(hash)
+        hash.each do |key, value|
+            puts key + " " + value.to_s
+            send("#{key}=", value)
+        end
+    end
+    
+    def attributes
+        instance_values
+    end
+end
+
+class Blob < CheckValues
+    include ActiveModel::Serializers::JSON
+    
+    attr_accessor :bytes, :blob_id, :sha1, :document_id, :md5
+    
+    def attributes=(hash)
+        hash.each do |key, value|
+            puts key + " " + value.to_s
+            send("#{key}=", value)
+        end
+    end
+    
+    def attributes
+        instance_values
+    end
+end
+
+class GetBlobResponse < CheckValues
+    include ActiveModel::Serializers::JSON
+    
+    attr_accessor :blob_id, :path, :filename, :size, :sha1, :md5
+    
+    def attributes=(hash)
+        hash.each do |key, value|
+            puts key + " " + value.to_s
+            send("#{key}=", value)
+        end
+    end
+    
+    def attributes
+        instance_values
+    end
+end
+
+class Blobs < ChinoBaseAPI
+   
+   def upload_blob(path, filename, document_id, field)
+       chunk_size = 1024*32
+       check_string(path)
+       check_string(document_id)
+       check_string(field)
+       check_string(filename)
+       blob = InitBlobResponse.new
+       blob = init_upload(filename, document_id, field)
+       bytes = []
+       offset = 0
+       File.open(path+filename, 'rb') { |file|
+           while (buffer = file.read(chunk_size)) do
+               upload_chunk(blob.upload_id, buffer, offset)
+               offset = offset+buffer.length
+           end
+#           end_of_file = File.size(path+filename)
+#           file.each_byte() { |byte|
+#               if end_of_file > chunk_size
+#                   if bytes.count < chunk_size
+#                       bytes << byte
+#                    else
+#                       upload_chunk(blob.upload_id, bytes, offset)
+#                       offset = offset + chunk_size
+#                       bytes = []
+#                    end
+#                else
+#                    bytes << byte
+#                end
+#           }
+#           upload_chunk(blob.upload_id, bytes, offset)
+#           offset = offset + chunk_size
+#           bytes = []
+           commit_upload(blob.upload_id)
+       }
+       
+   end
+   
+   def init_upload(filename, document_id, field)
+       check_string(filename)
+       check_string(document_id)
+       check_string(field)
+       data = {"file_name": filename, "document_id": document_id, "field": field}.to_json
+       blob = InitBlobResponse.new
+       blob.from_json(ActiveSupport::JSON.decode(post_resource("/blobs", data).to_json)['blob'].to_json)
+       blob
+   end
+   
+   def upload_chunk(upload_id, bytes, offset)
+       uri = return_uri("/blobs/#{upload_id}")
+       req = Net::HTTP::Put.new(uri)
+       req.body = bytes
+       req.add_field("length", bytes.length)
+       req.add_field("offset", offset)
+       req.add_field("Content-Type", "application/octet-stream")
+       if @customer_id == "Bearer "
+           req.add_field("Authorization", @customer_id+@customer_key)
+           else
+           req.basic_auth @customer_id, @customer_key
+       end
+       res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
+           http.request(req)
+       }
+       blob = InitBlobResponse.new
+       blob.from_json(parse_response(res)['data'].to_json, true)
+       blob
+   end
+   
+   def commit_upload(upload_id)
+       check_string(upload_id)
+       data = {"upload_id": upload_id}.to_json
+       blob = Blob.new
+       blob.from_json(post_resource("/blobs/commit", data).to_json, true)
+       blob
+    end
+    
+    def get(blob_id, destination)
+        check_string(blob_id)
+        check_string(destination)
+        uri = return_uri("/blobs/#{blob_id}")
+        req = Net::HTTP::Get.new(uri.path)
+        if @customer_id == "Bearer "
+            req.add_field("Authorization", @customer_id+@customer_key)
+            else
+            req.basic_auth @customer_id, @customer_key
+        end
+        res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
+            http.request(req)
+        }
+        blob = GetBlobResponse.new
+        blob.blob_id = blob_id
+        filename = res.header['Content-Disposition'].partition('=').last
+        blob.filename = filename
+        blob.path = destination
+        File.open(destination+filename, 'wb') { |file|
+            file << res.body
+            blob.md5 = Digest::MD5.file file
+            blob.sha1 = Digest::SHA1.file file
+            blob.size = file.size
+        }
+        blob
+    end
+    
+    def delete_blob(blob_id, force)
+        check_string(blob_id)
+        check_boolean(force)
+        delete_resource("/blobs/#{blob_id}", force)
+    end
+end
+
 #------------------------------RUNNING CODE-----------------------------------#
 
 if __FILE__ == $0
@@ -1650,6 +1816,8 @@ if __FILE__ == $0
 
 #    DEVELOPMENT_KEYS = KEYS['development_old']
     DEVELOPMENT_KEYS = KEYS['development']
+
+    puts DEVELOPMENT_KEYS
 
     chinoAPI = ChinoAPI.new(DEVELOPMENT_KEYS['customer_id'], DEVELOPMENT_KEYS['customer_key'], DEVELOPMENT_KEYS['url'])
     
@@ -1669,7 +1837,7 @@ if __FILE__ == $0
 #    end
 #    
 #    #-------------------DELETE ALL------------------------#
-#    
+    
 #    puts "DELETE ALL"
 #    
 #    schemas = chinoAPI.user_schemas.list_user_schemas()
@@ -1870,6 +2038,7 @@ if __FILE__ == $0
     fields = []
     fields.push(Field.new("string", "test_string", true))
     fields.push(Field.new("integer", "test_integer", true))
+    fields.push(Field.new("blob", "test_blob", false))
     
     schema = chinoAPI.schemas.create_schema(repo.repository_id, "test-schema-description-ruby", fields)
     puts schema.description + " " + schema.schema_id
@@ -2018,6 +2187,29 @@ if __FILE__ == $0
         puts "attributes: " + u.user_attributes.to_s
     end
     
+    #-------------------BLOBS------------------------#
+    
+    puts "BLOBS"
+    
+    filename = "Chino.io-eBook-Health-App-Compliance.pdf"
+    path = "app/assets/images/"
+    
+    blob = chinoAPI.blobs.upload_blob(path, filename, doc.document_id, "test_blob")
+    puts "document_id: "+blob.document_id.to_s
+    puts "blob_id: "+blob.blob_id.to_s
+    puts "bytes: "+blob.bytes.to_s
+    puts "sha1: "+blob.sha1.to_s
+    puts "md5: "+blob.md5.to_s
+    
+    blob = chinoAPI.blobs.get(blob.blob_id, "app/assets/")
+    puts "blob_id: "+blob.blob_id.to_s
+    puts "path: "+blob.path.to_s
+    puts "filename: "+blob.filename.to_s
+    puts "size: "+blob.size.to_s
+    puts "sha1: "+blob.sha1.to_s
+    puts "md5: "+blob.md5.to_s
+    
+    puts "Delete blob: " + chinoAPI.blobs.delete_blob(blob.blob_id, true)
     puts "Delete group: " + chinoAPI.groups.delete_group(group.group_id, true)
     puts "Delete user: " + chinoAPI.users.delete_user(usr.user_id, true)
     puts "Delete user_schema: " + chinoAPI.user_schemas.delete_user_schema(u_schema.user_schema_id, true)
@@ -2025,5 +2217,4 @@ if __FILE__ == $0
     puts "Delete document: " + chinoAPI.documents.delete_document(doc.document_id, true)
     puts "Delete schema: " + chinoAPI.schemas.delete_schema(schema.schema_id, true)
     puts "Delete repository: " + chinoAPI.repositories.delete_repository(repo.repository_id, true)
-
 end
