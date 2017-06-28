@@ -1651,7 +1651,6 @@ class InitBlobResponse < CheckValues
     
     def attributes=(hash)
         hash.each do |key, value|
-            puts key + " " + value.to_s
             send("#{key}=", value)
         end
     end
@@ -1668,7 +1667,6 @@ class Blob < CheckValues
     
     def attributes=(hash)
         hash.each do |key, value|
-            puts key + " " + value.to_s
             send("#{key}=", value)
         end
     end
@@ -1685,7 +1683,6 @@ class GetBlobResponse < CheckValues
     
     def attributes=(hash)
         hash.each do |key, value|
-            puts key + " " + value.to_s
             send("#{key}=", value)
         end
     end
@@ -1712,98 +1709,78 @@ class Blobs < ChinoBaseAPI
                 upload_chunk(blob.upload_id, buffer, offset)
                 offset = offset+buffer.length
             end
-            #           end_of_file = File.size(path+filename)
-            #           file.each_byte() { |byte|
-            #               if end_of_file > chunk_size
-            #                   if bytes.count < chunk_size
-            #                       bytes << byte
-            #                    else
-            #                       upload_chunk(blob.upload_id, bytes, offset)
-            #                       offset = offset + chunk_size
-            #                       bytes = []
-            #                    end
-            #                else
-            #                    bytes << byte
-            #                end
-            #           }
-            #           upload_chunk(blob.upload_id, bytes, offset)
-            #           offset = offset + chunk_size
-            #           bytes = []
             commit_upload(blob.upload_id)
-            }
+        }
+    end
             
-            end
+    def init_upload(filename, document_id, field)
+        check_string(filename)
+        check_string(document_id)
+        check_string(field)
+        data = {"file_name": filename, "document_id": document_id, "field": field}.to_json
+        blob = InitBlobResponse.new
+        blob.from_json(ActiveSupport::JSON.decode(post_resource("/blobs", data).to_json)['blob'].to_json)
+        blob
+    end
             
-            def init_upload(filename, document_id, field)
-            check_string(filename)
-            check_string(document_id)
-            check_string(field)
-            data = {"file_name": filename, "document_id": document_id, "field": field}.to_json
-            blob = InitBlobResponse.new
-            blob.from_json(ActiveSupport::JSON.decode(post_resource("/blobs", data).to_json)['blob'].to_json)
-            blob
-            end
-            
-            def upload_chunk(upload_id, bytes, offset)
-            uri = return_uri("/blobs/#{upload_id}")
-            req = Net::HTTP::Put.new(uri)
-            req.body = bytes
-            req.add_field("length", bytes.length)
-            req.add_field("offset", offset)
-            req.add_field("Content-Type", "application/octet-stream")
-            if @customer_id == "Bearer "
-                req.add_field("Authorization", @customer_id+@customer_key)
-                else
-                req.basic_auth @customer_id, @customer_key
-            end
-            res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
-                http.request(req)
-            }
-            blob = InitBlobResponse.new
-            blob.from_json(parse_response(res)['data'].to_json, true)
-            blob
-            end
-            
-            def commit_upload(upload_id)
-            check_string(upload_id)
-            data = {"upload_id": upload_id}.to_json
-            blob = Blob.new
-            blob.from_json(post_resource("/blobs/commit", data).to_json, true)
-            blob
-            end
-            
-            def get(blob_id, destination)
-            check_string(blob_id)
-            check_string(destination)
-            uri = return_uri("/blobs/#{blob_id}")
-            req = Net::HTTP::Get.new(uri.path)
-            if @customer_id == "Bearer "
-                req.add_field("Authorization", @customer_id+@customer_key)
-                else
-                req.basic_auth @customer_id, @customer_key
-            end
-            res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
-                http.request(req)
-            }
-            blob = GetBlobResponse.new
-            blob.blob_id = blob_id
-            filename = res.header['Content-Disposition'].partition('=').last
-            blob.filename = filename
-            blob.path = destination
-            File.open(destination+filename, 'wb') { |file|
-                file << res.body
-                blob.md5 = Digest::MD5.file file
-                blob.sha1 = Digest::SHA1.file file
-                blob.size = file.size
-            }
-            blob
-            end
-            
-            def delete_blob(blob_id, force)
-            check_string(blob_id)
-            check_boolean(force)
-            delete_resource("/blobs/#{blob_id}", force)
-            end
-            end
-            
-            
+    def upload_chunk(upload_id, bytes, offset)
+        uri = return_uri("/blobs/#{upload_id}")
+        req = Net::HTTP::Put.new(uri)
+        req.body = bytes
+        req.add_field("length", bytes.length)
+        req.add_field("offset", offset)
+        req.add_field("Content-Type", "application/octet-stream")
+        if @customer_id == "Bearer "
+            req.add_field("Authorization", @customer_id+@customer_key)
+            else
+            req.basic_auth @customer_id, @customer_key
+        end
+        res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
+            http.request(req)
+        }
+        blob = InitBlobResponse.new
+        blob.from_json(parse_response(res)['data'].to_json, true)
+        blob
+    end
+    
+    def commit_upload(upload_id)
+        check_string(upload_id)
+        data = {"upload_id": upload_id}.to_json
+        blob = Blob.new
+        blob.from_json(post_resource("/blobs/commit", data).to_json, true)
+        blob
+    end
+    
+    def get(blob_id, destination)
+        check_string(blob_id)
+        check_string(destination)
+        uri = return_uri("/blobs/#{blob_id}")
+        req = Net::HTTP::Get.new(uri.path)
+        if @customer_id == "Bearer "
+            req.add_field("Authorization", @customer_id+@customer_key)
+            else
+            req.basic_auth @customer_id, @customer_key
+        end
+        res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
+            http.request(req)
+        }
+        blob = GetBlobResponse.new
+        blob.blob_id = blob_id
+        filename = res.header['Content-Disposition'].partition('=').last
+        blob.filename = filename
+        blob.path = destination
+        File.open(destination+filename, 'wb') { |file|
+            file << res.body
+            blob.md5 = (Digest::MD5.file file).hexdigest
+            blob.sha1 = (Digest::SHA1.file file).hexdigest
+            blob.size = file.size
+        }
+        blob
+    end
+    
+    def delete_blob(blob_id, force)
+        check_string(blob_id)
+        check_boolean(force)
+        delete_resource("/blobs/#{blob_id}", force)
+    end
+end

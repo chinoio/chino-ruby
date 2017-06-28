@@ -312,7 +312,7 @@ class SDKTest < Test::Unit::TestCase
        schema = @client.schemas.create_schema(repo.repository_id, description, fields)
        assert_equal(schema.description, description)
        assert_equal(schema.getFields.size, 3)
-       assert_not_equal(schema.schema_id, description)
+       assert_not_equal(schema.schema_id, "")
        
        content = Hash.new
        content["test_string"] = "sample value ruby"
@@ -371,7 +371,7 @@ class SDKTest < Test::Unit::TestCase
        schema = @client.schemas.create_schema(repo.repository_id, description, fields)
        assert_equal(schema.description, description)
        assert_equal(schema.getFields.size, 3)
-       assert_not_equal(schema.schema_id, description)
+       assert_not_equal(schema.schema_id, "")
        
        content = Hash.new
        content["test_string"] = "sample value ruby"
@@ -441,7 +441,7 @@ class SDKTest < Test::Unit::TestCase
        schema = @client.schemas.create_schema(repo.repository_id, description, fields)
        assert_equal(schema.description, description)
        assert_equal(schema.getFields.size, 3)
-       assert_not_equal(schema.schema_id, description)
+       assert_not_equal(schema.schema_id, "")
        
        content = Hash.new
        content["test_string"] = "sample value ruby"
@@ -507,10 +507,105 @@ class SDKTest < Test::Unit::TestCase
         assert_equal(@client.schemas.delete_schema(schema.schema_id, true), @success)
         assert_equal(@client.repositories.delete_repository(repo.repository_id, true), @success)
    end
+   
+   def test_blobs
+       description = "test_repository_ruby"
+       repo = @client.repositories.create_repository(description)
+       assert_equal(repo.description, description)
+       assert_not_equal(repo.repository_id, "")
+       
+       fields = []
+       fields.push(Field.new("string", "test_string", true))
+       fields.push(Field.new("integer", "test_integer", true))
+       fields.push(Field.new("blob", "test_blob", false))
+       
+       description = "test-schema-description-ruby"
+       
+       schema = @client.schemas.create_schema(repo.repository_id, description, fields)
+       assert_equal(schema.description, description)
+       assert_equal(schema.getFields.size, 3)
+       assert_not_equal(schema.schema_id, "")
+       
+       content = Hash.new
+       content["test_string"] = "sample value ruby"
+       content["test_integer"] = 1233
+       
+       doc = @client.documents.create_document(schema.schema_id, content)
+       assert_not_equal(doc.document_id, "")
+       
+       filename = "Chino.io-eBook-Health-App-Compliance.pdf"
+       path = "testfiles/"
+       
+       blob = @client.blobs.upload_blob(path, filename, doc.document_id, "test_blob")
+       assert_not_equal(blob.document_id, "")
+       assert_not_equal(blob.blob_id, "")
+       
+       output_path = "testfiles/output/"
+       
+       getBlob = @client.blobs.get(blob.blob_id, output_path)
+       assert_not_equal(getBlob.blob_id, "")
+       assert_equal(getBlob.path, output_path)
+       assert_equal(getBlob.filename, filename)
+       #assert_equal(blob.size, getBlob.size)
+       assert_equal(blob.sha1, getBlob.sha1)
+       assert_equal(blob.md5, getBlob.md5)
+       
+       assert_equal(@client.blobs.delete_blob(blob.blob_id, true), @success)
+       assert_equal(@client.documents.delete_document(doc.document_id, true), @success)
+       assert_equal(@client.schemas.delete_schema(schema.schema_id, true), @success)
+       assert_equal(@client.repositories.delete_repository(repo.repository_id, true), @success)
+   end
+   
+   def test_auth
+       description = "test-user-schema-description-ruby"
+       fields = []
+       fields.push(Field.new("string", "test_string", true))
+       fields.push(Field.new("integer", "test_integer", true))
+       
+       u_schema = @client.user_schemas.create_user_schema(description, fields)
+       assert_equal(u_schema.description, description)
+       assert_equal(u_schema.getFields.size, 2)
+       assert_not_equal(u_schema.user_schema_id, "")
+       
+       attributes = Hash.new
+       attributes["test_string"] = "sample value ruby"
+       attributes["test_integer"] = 123
+       
+       username = "testUsernameRuby"+rand(1..300).to_s
+       
+       usr = @client.users.create_user(u_schema.user_schema_id, username, "testPassword", attributes)
+       assert_equal(usr.user_attributes['test_string'], "sample value ruby")
+       assert_equal(usr.user_attributes['test_integer'], 123)
+       assert_not_equal(usr.user_id, "")
+       
+       description = "test_application_ruby"
+       
+       app = @client.applications.create_application(description, "password", "")
+       assert_equal(app.app_name, description)
+       assert_not_equal(app.app_id, "")
+       
+       l_usr = @client.auth.loginWithPassword(username, "testPassword", app.app_id, app.app_secret)
+       assert_not_equal(l_usr.access_token, "")
+       assert_not_equal(l_usr.token_type, "")
+       assert_not_equal(l_usr.refresh_token, "")
+       
+       l_usr = @client.auth.refreshToken(l_usr.refresh_token, app.app_id, app.app_secret)
+       assert_not_equal(l_usr.access_token, "")
+       assert_not_equal(l_usr.token_type, "")
+       
+       chinoAPI = ChinoAPI.new("Bearer ", l_usr.access_token, @DEVELOPMENT_KEYS['url'])
+       
+       assert_equal(@client.auth.logout(l_usr.access_token, app.app_id, app.app_secret), @success)
+       
+       @client = ChinoAPI.new(@DEVELOPMENT_KEYS['customer_id'], @DEVELOPMENT_KEYS['customer_key'], @DEVELOPMENT_KEYS['url'])
+
+       assert_equal(@client.users.delete_user(usr.user_id, true), @success)
+       assert_equal(@client.user_schemas.delete_user_schema(u_schema.user_schema_id, true), @success)
+   end
 end
 
     #-------------------ACTIVE ALL------------------------#
-    
+
     #    repos = chinoAPI.repositories.list_repositories()
     #    repos.repositories.each do |r|
     #        chinoAPI.repositories.update_repository(r.repository_id, r.description, true)
@@ -559,49 +654,4 @@ end
     #    groups.groups.each do |g|
     #        puts chinoAPI.groups.delete_group(g.group_id, true)
     #    end
-    
-    #-------------------APPLICATIONS AND AUTH------------------------#
 
-    #    usr = chinoAPI.auth.loginWithPassword("testUsernames", "testPassword", app.app_id, app.app_secret)
-    #    puts usr.access_token + " " + usr.token_type
-    #
-    #    usr = chinoAPI.auth.refreshToken(usr.refresh_token, app.app_id, app.app_secret)
-    #    puts usr.access_token + " " + usr.token_type
-    #
-    #    chinoAPI = ChinoAPI.new("Bearer ", usr.access_token, url)
-    #
-    #    puts chinoAPI.auth.logout(usr.access_token, app.app_id, app.app_secret)
-    #
-    #    chinoAPI = ChinoAPI.new(customer_id, customer_key, url)
-
-#
-#    #-------------------BLOBS------------------------#
-#    
-#    #                puts "BLOBS"
-#    #
-#    #                filename = "Chino.io-eBook-Health-App-Compliance.pdf"
-#    #                path = "app/assets/images/"
-#    #
-#    #                blob = chinoAPI.blobs.upload_blob(path, filename, doc.document_id, "test_blob")
-#    #                puts "document_id: "+blob.document_id.to_s
-#    #                puts "blob_id: "+blob.blob_id.to_s
-#    #                puts "bytes: "+blob.bytes.to_s
-#    #                puts "sha1: "+blob.sha1.to_s
-#    #                puts "md5: "+blob.md5.to_s
-#    #
-#    #                blob = chinoAPI.blobs.get(blob.blob_id, "app/assets/")
-#    #                puts "blob_id: "+blob.blob_id.to_s
-#    #                puts "path: "+blob.path.to_s
-#    #                puts "filename: "+blob.filename.to_s
-#    #                puts "size: "+blob.size.to_s
-#    #                puts "sha1: "+blob.sha1.to_s
-#    #                puts "md5: "+blob.md5.to_s
-#    #
-#    #                puts "Delete blob: " + chinoAPI.blobs.delete_blob(blob.blob_id, true)
-#    
-#    puts "Delete group: " + chinoAPI.groups.delete_group(group.group_id, true)
-#    puts "Delete user: " + chinoAPI.users.delete_user(usr.user_id, true)
-#    puts "Delete user_schema: " + chinoAPI.user_schemas.delete_user_schema(u_schema.user_schema_id, true)
-#    puts "Delete collection: " + chinoAPI.collections.delete_collection(col.collection_id, true)
-#
-#end
