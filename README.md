@@ -1,6 +1,6 @@
 # ChinoRuby
 
-Official Ruby wrapper of the Chino.io
+Official Ruby wrapper of the Chino.io API
 
 ## Installation
 
