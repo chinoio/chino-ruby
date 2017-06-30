@@ -26,6 +26,28 @@ Initialize a Chino.io client variable as follow
 @client = ChinoAPI.new(<your-customer-id>, <your-customer-key>, <server-url>)
 ```
 The server-url parameter must be `https://api.test.chino.io/v1` or `https://api.chino.io/v1`.
+Once you created your client variable, you can use it to call functions and communicate with the server.
+The creation of a basic document is as follow:
+    - First, create the Repository
+```ruby
+@repo = @client.repositories.create_repository("test repo description")
+```
+    - Then create the Schema
+```ruby
+fields = []
+fields.push(Field.new("string", "test_string", true))
+fields.push(Field.new("integer", "test_integer", true))
+
+@schema = @client.schemas.create_schema(@repo.repository_id, "test schema description", fields)
+```
+    - Finally, create the Document
+```ruby
+content = Hash.new
+content["test_string"] = "sample value ruby"
+content["test_integer"] = 123
+
+@doc = @client.documents.create_document(@schema.schema_id, content)
+```
 
 ## Development
 

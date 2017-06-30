@@ -7,11 +7,13 @@ class SDKTest < Test::Unit::TestCase
        @RAILS_ROOT = File.join(File.dirname(__FILE__), '../')
        @KEYS = YAML::load(File.open("#{@RAILS_ROOT}/config-chino.yml"))
        
-       #    @DEVELOPMENT_KEYS = @KEYS['development_old']
+       #@DEVELOPMENT_KEYS = @KEYS['development_old']
        @DEVELOPMENT_KEYS = @KEYS['development']
        
        @client = ChinoAPI.new(@DEVELOPMENT_KEYS['customer_id'], @DEVELOPMENT_KEYS['customer_key'], @DEVELOPMENT_KEYS['url'])
        @success = "success"
+       #active_all
+       delete_all
    end
    
    def test_applications
@@ -39,7 +41,7 @@ class SDKTest < Test::Unit::TestCase
    end
    
    def test_repositories
-       description = "test_repository_ruby"
+       description = "test repository ruby"
        description_updated = "test_repository_ruby_updated"
        repo = @client.repositories.create_repository(description)
        assert_equal(repo.description, description)
@@ -602,56 +604,75 @@ class SDKTest < Test::Unit::TestCase
        assert_equal(@client.users.delete_user(usr.user_id, true), @success)
        assert_equal(@client.user_schemas.delete_user_schema(u_schema.user_schema_id, true), @success)
    end
+   
+   def test_errors
+       assert_raise ArgumentError do
+           @client.applications.create_application(12, "password", "")
+       end
+       app = @client.applications.create_application("test-app-ruby", "password", "")
+       assert_raise ChinoAuthError do
+           @client.auth.loginWithPassword("wrong-username", "testPassword", app.app_id, app.app_secret)
+       end
+       assert_raise ChinoError do
+           @client.applications.get_application("wrong-id")
+       end
+       assert_raise URI::InvalidURIError do
+           @client.applications.get_application("wrong id")
+       end
+       assert_raise ChinoError do
+           @client.applications.list_applications_with_params(-2, 2)
+       end
+       assert_raise ChinoError do
+           @client.applications.list_applications_with_params(300, 2)
+       end
+   end
+   
+   def delete_all
+       schemas = @client.user_schemas.list_user_schemas()
+       schemas.user_schemas.each do |s|
+           users = @client.users.list_users(s.user_schema_id)
+           users.users.each do |u|
+               puts @client.users.delete_user(u.user_id, true)
+           end
+           puts @client.user_schemas.delete_user_schema(s.user_schema_id, true)
+       end
+       
+       repos = @client.repositories.list_repositories()
+       repos.repositories.each do |r|
+           schemas = @client.schemas.list_schemas(r.repository_id)
+           schemas.schemas.each do |s|
+               docs = @client.documents.list_documents(s.schema_id, true)
+               docs.documents.each do |d|
+                   puts @client.documents.delete_document(d.document_id, true)
+               end
+               puts @client.schemas.delete_schema(s.schema_id, true)
+           end
+           puts @client.repositories.delete_repository(r.repository_id, true)
+       end
+       
+       cols = @client.collections.list_collections()
+       cols.collections.each do |c|
+           puts @client.collections.delete_collection(c.collection_id, true)
+       end
+       
+       groups = @client.groups.list_groups()
+       groups.groups.each do |g|
+           puts @client.groups.delete_group(g.group_id, true)
+       end
+   end
+   
+   def active_all
+       repos = @client.repositories.list_repositories()
+       repos.repositories.each do |r|
+           @client.repositories.update_repository(r.repository_id, r.description, true)
+           schemas = @client.schemas.list_schemas(r.repository_id)
+           schemas.schemas.each do |s|
+               @client.schemas.update_schema(s.schema_id, s.description, s.getFields(), true)
+               docs = @client.documents.list_documents(s.schema_id, true)
+               docs.documents.each do |d|
+                   @client.documents.update_document(d.document_id, d.content, true)
+               end
+           end
+       end
+   end
 end
-
-    #-------------------ACTIVE ALL------------------------#
-
-    #    repos = chinoAPI.repositories.list_repositories()
-    #    repos.repositories.each do |r|
-    #        chinoAPI.repositories.update_repository(r.repository_id, r.description, true)
-    #        schemas = chinoAPI.schemas.list_schemas(r.repository_id)
-    #        schemas.schemas.each do |s|
-    #            chinoAPI.schemas.update_schema(s.schema_id, s.description, s.getFields(), true)
-    #            docs = chinoAPI.documents.list_documents(s.schema_id, true)
-    #            docs.documents.each do |d|
-    #                chinoAPI.documents.update_document(d.document_id, d.content, true)
-    #            end
-    #        end
-    #    end
-    #
-    #    #-------------------DELETE ALL------------------------#
-    
-    #    puts "DELETE ALL"
-    #
-    #    schemas = chinoAPI.user_schemas.list_user_schemas()
-    #    schemas.user_schemas.each do |s|
-    #        users = chinoAPI.users.list_users(s.user_schema_id)
-    #        users.users.each do |u|
-    #            puts chinoAPI.users.delete_user(u.user_id, true)
-    #        end
-    #        puts chinoAPI.user_schemas.delete_user_schema(s.user_schema_id, true)
-    #    end
-    #
-    #    repos = chinoAPI.repositories.list_repositories()
-    #    repos.repositories.each do |r|
-    #        schemas = chinoAPI.schemas.list_schemas(r.repository_id)
-    #        schemas.schemas.each do |s|
-    #            docs = chinoAPI.documents.list_documents(s.schema_id, true)
-    #            docs.documents.each do |d|
-    #                puts chinoAPI.documents.delete_document(d.document_id, true)
-    #            end
-    #            puts chinoAPI.schemas.delete_schema(s.schema_id, true)
-    #        end
-    #        puts chinoAPI.repositories.delete_repository(r.repository_id, true)
-    #    end
-    #
-    #    cols = chinoAPI.collections.list_collections()
-    #    cols.collections.each do |c|
-    #        puts chinoAPI.collections.delete_collection(c.collection_id, true)
-    #    end
-    #
-    #    groups = chinoAPI.groups.list_groups()
-    #    groups.groups.each do |g|
-    #        puts chinoAPI.groups.delete_group(g.group_id, true)
-    #    end
-

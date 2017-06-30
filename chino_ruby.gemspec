@@ -5,7 +5,7 @@ require "chino_ruby/version"
 
 Gem::Specification.new do |spec|
   spec.name          = "chino_ruby"
-  spec.version       = ChinoRuby::VERSION
+  spec.version       = '1.0'
   spec.authors       = ["Paolo Prem"]
   spec.email         = ["prempaolo@gmail.com"]
 
@@ -19,12 +19,12 @@ Gem::Specification.new do |spec|
 
   # Prevent pushing this gem to RubyGems.org. To allow pushes either set the 'allowed_push_host'
   # to allow pushing to a single host or delete this section to allow pushing to any host.
-  if spec.respond_to?(:metadata)
-    spec.metadata["allowed_push_host"] = "TODO: Set to 'http://mygemserver.com'"
-  else
-    raise "RubyGems 2.0 or newer is required to protect against " \
-      "public gem pushes."
-  end
+# if spec.respond_to?(:metadata)
+#   spec.metadata["allowed_push_host"] = "TODO: Set to 'http://mygemserver.com'"
+# else
+#   raise "RubyGems 2.0 or newer is required to protect against " \
+#     "public gem pushes."
+# end
 
   spec.files         = `git ls-files -z`.split("\x0").reject do |f|
     f.match(%r{^(test|spec|features)/})
@@ -37,6 +37,6 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rake", '~> 10.0'
   spec.add_dependency "listen", '~> 3.0'
   spec.add_runtime_dependency 'rails', '~> 5.1', '>= 5.1.1'
-  spec.add_development_dependency 'test-unit', '~> 0'
+  spec.add_development_dependency 'test-unit', "~> 3.1.2"
   spec.add_development_dependency 'spring', '~> 0'
 end

@@ -165,6 +165,7 @@ class ChinoBaseAPI < CheckValues
     end
     
     def post_resource(path, data)
+        check_string(path)
         uri = return_uri(path)
         req = Net::HTTP::Post.new(uri.path)
         if @customer_id == "Bearer "
@@ -180,6 +181,7 @@ class ChinoBaseAPI < CheckValues
     end
     
     def post_resource_with_params(path, data, limit, offset)
+        check_string(path)
         uri = return_uri_with_params(path, limit, offset)
         req = Net::HTTP::Post.new(uri.path)
         if @customer_id == "Bearer "
@@ -195,6 +197,7 @@ class ChinoBaseAPI < CheckValues
     end
     
     def post_resource_with_string_result(path, data)
+        check_string(path)
         uri = return_uri(path)
         req = Net::HTTP::Post.new(uri.path)
         if @customer_id == "Bearer "
@@ -210,6 +213,7 @@ class ChinoBaseAPI < CheckValues
     end
     
     def post_resource_with_no_data(path)
+        check_string(path)
         uri = return_uri(path)
         req = Net::HTTP::Post.new(uri.path)
         if @customer_id == "Bearer "
@@ -224,6 +228,7 @@ class ChinoBaseAPI < CheckValues
     end
     
     def put_resource(path, data)
+        check_string(path)
         uri = return_uri(path)
         req = Net::HTTP::Put.new(uri.path)
         if @customer_id == "Bearer "
@@ -239,6 +244,7 @@ class ChinoBaseAPI < CheckValues
     end
     
     def patch_resource(path, data)
+        check_string(path)
         uri = return_uri(path)
         req = Net::HTTP::Patch.new(uri.path)
         if @customer_id == "Bearer "
