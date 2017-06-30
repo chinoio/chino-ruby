@@ -50,10 +50,15 @@ content["test_integer"] = 123
 ```
 ## Running the Tests
 You have to run the following commands in the terminal in order to run the tests:
+
     $ gem install bundler
+
     $ bundle install
+
     $ cd test
+
     $ bundle exec ruby sdk_test.rb
+
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
