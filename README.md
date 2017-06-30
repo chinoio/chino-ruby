@@ -23,7 +23,7 @@ Or install it yourself as:
 Initialize a Chino.io client variable as follow
 
 ```ruby
-@client = ChinoAPI.new(<your-customer-id>, <your-customer-key>, <server-url>)
+@client = ChinoAPI.new("<your-customer-id>", "<your-customer-key>", "<server-url>")
 ```
 The server-url parameter must be `https://api.test.chino.io/v1` or `https://api.chino.io/v1`.
 Once you created your client variable, you can use it to call functions and communicate with the server.  
