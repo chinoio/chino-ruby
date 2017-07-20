@@ -7,13 +7,13 @@ class SDKTest < Test::Unit::TestCase
        @RAILS_ROOT = File.join(File.dirname(__FILE__), '../')
        @KEYS = YAML::load(File.open("#{@RAILS_ROOT}/config-chino.yml"))
        
-       #@DEVELOPMENT_KEYS = @KEYS['development_old']
-       @DEVELOPMENT_KEYS = @KEYS['development']
+       @DEVELOPMENT_KEYS = @KEYS['development_old']
+       #@DEVELOPMENT_KEYS = @KEYS['development']
        
        @client = ChinoAPI.new(@DEVELOPMENT_KEYS['customer_id'], @DEVELOPMENT_KEYS['customer_key'], @DEVELOPMENT_KEYS['url'])
        @success = "success"
        #active_all
-       delete_all
+       #delete_all
    end
    
    def test_applications
@@ -28,12 +28,12 @@ class SDKTest < Test::Unit::TestCase
        app = @client.applications.update_application(app.app_id, description_updated, "password", "")
        assert_equal(app.app_name, description_updated)
        assert_not_equal(app.app_id, "")
-       apps = @client.applications.list_applications()
+       apps = @client.applications.list_applications
        apps.applications.each do |a|
            assert_not_equal(app.app_id, "")
            assert_not_equal(app.app_name, "")
        end
-       apps = @client.applications.list_applications_with_params(2, 2)
+       apps = @client.applications.list_applications(2, 2)
        apps.applications.each do |a|
            assert_not_equal(app.app_id, "")
        end
@@ -51,7 +51,7 @@ class SDKTest < Test::Unit::TestCase
        assert_equal(repo.description, description_updated)
        assert_not_equal(repo.repository_id, "")
        
-       repos = @client.repositories.list_repositories()
+       repos = @client.repositories.list_repositories
        repos.repositories.each do |r|
            assert_not_equal(r.repository_id, "")
        end
@@ -143,7 +143,7 @@ class SDKTest < Test::Unit::TestCase
            assert_not_equal(d.document_id, "")
        end
        
-       docs = @client.documents.list_documents_with_params(schema.schema_id, false, 100, 0)
+       docs = @client.documents.list_documents(schema.schema_id, false, 100, 0)
        docs.documents.each do |d|
            assert_not_equal(d.document_id, "")
        end
@@ -175,7 +175,7 @@ class SDKTest < Test::Unit::TestCase
        assert_equal(u_schema.getFields.size, 2)
        assert_not_equal(u_schema.user_schema_id, "")
        
-       schemas = @client.user_schemas.list_user_schemas()
+       schemas = @client.user_schemas.list_user_schemas
        schemas.user_schemas.each do |s|
            assert_not_equal(s.user_schema_id, "")
        end
@@ -274,7 +274,7 @@ class SDKTest < Test::Unit::TestCase
        assert_equal(group.group_attributes['test_integer'], 1233)
        assert_not_equal(group.group_id, "")
        
-       groups = @client.groups.list_groups_with_params(100, 0)
+       groups = @client.groups.list_groups(100, 0)
        groups.groups.each do |g|
            assert_not_equal(g.group_id, "")
        end
@@ -536,13 +536,13 @@ class SDKTest < Test::Unit::TestCase
        assert_not_equal(doc.document_id, "")
        
        filename = "Chino.io-eBook-Health-App-Compliance.pdf"
-       path = "testfiles/"
+       path = "test/testfiles/"
        
        blob = @client.blobs.upload_blob(path, filename, doc.document_id, "test_blob")
        assert_not_equal(blob.document_id, "")
        assert_not_equal(blob.blob_id, "")
        
-       output_path = "testfiles/output/"
+       output_path = "test/testfiles/output/"
        
        getBlob = @client.blobs.get(blob.blob_id, output_path)
        assert_not_equal(getBlob.blob_id, "")
@@ -586,16 +586,16 @@ class SDKTest < Test::Unit::TestCase
        assert_equal(app.app_name, description)
        assert_not_equal(app.app_id, "")
        
-       l_usr = @client.auth.loginWithPassword(username, "testPassword", app.app_id, app.app_secret)
+       l_usr = @client.auth.login_password(username, "testPassword", app.app_id, app.app_secret)
        assert_not_equal(l_usr.access_token, "")
        assert_not_equal(l_usr.token_type, "")
        assert_not_equal(l_usr.refresh_token, "")
        
-       l_usr = @client.auth.refreshToken(l_usr.refresh_token, app.app_id, app.app_secret)
+       l_usr = @client.auth.refresh_token(l_usr.refresh_token, app.app_id, app.app_secret)
        assert_not_equal(l_usr.access_token, "")
        assert_not_equal(l_usr.token_type, "")
-       
-       chinoAPI = ChinoAPI.new("Bearer ", l_usr.access_token, @DEVELOPMENT_KEYS['url'])
+
+       @client = ChinoAPI.new("Bearer ", l_usr.access_token, @DEVELOPMENT_KEYS['url'])
        
        assert_equal(@client.auth.logout(l_usr.access_token, app.app_id, app.app_secret), @success)
        
@@ -611,7 +611,7 @@ class SDKTest < Test::Unit::TestCase
        end
        app = @client.applications.create_application("test-app-ruby", "password", "")
        assert_raise ChinoAuthError do
-           @client.auth.loginWithPassword("wrong-username", "testPassword", app.app_id, app.app_secret)
+           @client.auth.login_password("wrong-username", "testPassword", app.app_id, app.app_secret)
        end
        assert_raise ChinoError do
            @client.applications.get_application("wrong-id")
@@ -619,16 +619,10 @@ class SDKTest < Test::Unit::TestCase
        assert_raise URI::InvalidURIError do
            @client.applications.get_application("wrong id")
        end
-       assert_raise ChinoError do
-           @client.applications.list_applications_with_params(-2, 2)
-       end
-       assert_raise ChinoError do
-           @client.applications.list_applications_with_params(300, 2)
-       end
    end
    
    def delete_all
-       schemas = @client.user_schemas.list_user_schemas()
+       schemas = @client.user_schemas.list_user_schemas
        schemas.user_schemas.each do |s|
            users = @client.users.list_users(s.user_schema_id)
            users.users.each do |u|
@@ -637,7 +631,7 @@ class SDKTest < Test::Unit::TestCase
            puts @client.user_schemas.delete_user_schema(s.user_schema_id, true)
        end
        
-       repos = @client.repositories.list_repositories()
+       repos = @client.repositories.list_repositories
        repos.repositories.each do |r|
            schemas = @client.schemas.list_schemas(r.repository_id)
            schemas.schemas.each do |s|
@@ -650,24 +644,24 @@ class SDKTest < Test::Unit::TestCase
            puts @client.repositories.delete_repository(r.repository_id, true)
        end
        
-       cols = @client.collections.list_collections()
+       cols = @client.collections.list_collections
        cols.collections.each do |c|
            puts @client.collections.delete_collection(c.collection_id, true)
        end
        
-       groups = @client.groups.list_groups()
+       groups = @client.groups.list_groups
        groups.groups.each do |g|
            puts @client.groups.delete_group(g.group_id, true)
        end
    end
    
    def active_all
-       repos = @client.repositories.list_repositories()
+       repos = @client.repositories.list_repositories
        repos.repositories.each do |r|
            @client.repositories.update_repository(r.repository_id, r.description, true)
            schemas = @client.schemas.list_schemas(r.repository_id)
            schemas.schemas.each do |s|
-               @client.schemas.update_schema(s.schema_id, s.description, s.getFields(), true)
+               @client.schemas.update_schema(s.schema_id, s.description, s.getFields, true)
                docs = @client.documents.list_documents(s.schema_id, true)
                docs.documents.each do |d|
                    @client.documents.update_document(d.document_id, d.content, true)

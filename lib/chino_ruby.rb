@@ -6,14 +6,57 @@ require "json"
 require "yaml"
 require "digest"
 
+# Module for constant values
 module ChinoRuby
   QUERY_DEFAULT_LIMIT = 100
 end
 
-class ChinoAPI
+class CheckValues
+    
+    # This function is used to check if a parameter passed to a function is a string, otherwise it raises an error
+    def check_string(value)
+        if not value.is_a?(String)
+            raise ArgumentError, "{#value} must be a String, got #{value.inspect}"
+        end
+    end
+    
+    # This function is used to check if a parameter passed to a function is an integer, otherwise it raises an error
+    def check_int(value)
+        if not value.is_a?(Integer)
+            raise ArgumentError, "{#value} must be a Int, got #{value.inspect}"
+        end
+    end
+    
+    # This function is used to check if a parameter passed to a function is a boolean, otherwise it raises an error
+    def check_boolean(value)
+        if not !!value == value
+            raise ArgumentError, "{#value} must be a Boolean, got #{value.inspect}"
+        end
+    end
+    
+    # This function is used to check if a parameter passed to a function can be converted to json, otherwise it raises an error
+    def check_json(value)
+        if not value.respond_to?(:to_json)
+            raise ArgumentError, "{#value} cannot be converted to json!"
+        end
+    end
+end
+
+# Class which contains every Chino.io resource as objects. In this way if you create a 'client' variable of this class,
+# it will contain every function for the creation, update, retrieval... of every resource.
+# Every function is easily accessible as follow:
+#   name_of_the_client_variable.name_of_the_resource.name_of_the_function()
+# Example of the creation of a Repository
+#   @client = ChinoAPI.new(...)
+#   @client.repositories.create_repository(...)
+class ChinoAPI < CheckValues
     
     attr_accessor :applications, :auth, :repositories, :schemas, :documents, :user_schemas, :users, :groups, :collections, :permissions, :search, :blobs
     
+    # Use this function to initialize your client variable
+    # * customer_id: your customer id value
+    # * customer_key: your customer key value
+    # * host_url: the url of the server, use 'https://api.test.chino.io/v1' for development and 'https://api.chino.io/v1' for the production
     def initialize(customer_id, customer_key, host_url)
         check_string(customer_id)
         check_string(customer_key)
@@ -34,47 +77,15 @@ class ChinoAPI
         @search = Search.new(@customer_id, @customer_key, @host_url)
         @blobs = Blobs.new(@customer_id, @customer_key, @host_url)
     end
-    
-    def check_string(value)
-        if not value.is_a?(String)
-            raise ArgumentError, "{#value} must be a String, got #{value.inspect}"
-        end
-    end
-    
-    def initUser()
-        
-    end
 end
 
-class CheckValues
-    def check_string(value)
-        if not value.is_a?(String)
-            raise ArgumentError, "{#value} must be a String, got #{value.inspect}"
-        end
-    end
-    
-    def check_int(value)
-        if not value.is_a?(Integer)
-            raise ArgumentError, "{#value} must be a Int, got #{value.inspect}"
-        end
-    end
-    
-    def check_boolean(value)
-        if not !!value == value
-            raise ArgumentError, "{#value} must be a Boolean, got #{value.inspect}"
-        end
-    end
-    
-    def check_json(value)
-        if not value.respond_to?(:to_json)
-            raise ArgumentError, "{#value} cannot be converted to json!"
-        end
-    end
-end
-
+# Class which defines the fields for the creation of a Schema or a UserSchema
 class Field < CheckValues
     attr_accessor :type, :name, :indexed
     
+    # * type: type of the field in the Schema/UserSchema. Ex: 'string'
+    # * name: name of the field in the Schema/UserSchema
+    # * indexed: if true, the field will be indexed on the server. That means it can be used to make a search request
     def initialize(type, name, indexed)
         check_string(type)
         check_string(name)
@@ -84,13 +95,16 @@ class Field < CheckValues
         self.indexed = indexed
     end
     
+    # Returns the values as a json
     def to_json
         return {"type": type, "name": name, "indexed": indexed}.to_json
     end
 end
 
+# Base class of every resource class. It contains the functions for the GET, POST, PUT, PATCH and DELETE requests
 class ChinoBaseAPI < CheckValues
     
+    # Used to inizialize a customer or a user. If you want to authenticate a user, simply pass "" as the customer_id
     def initialize(customer_id, customer_key, host_url)
         if customer_id == ""
             @customer_id = "Bearer "
@@ -100,32 +114,35 @@ class ChinoBaseAPI < CheckValues
         @host_url = host_url
     end
     
-    def return_uri_with_params(path, limit, offset)
+    #returns the uri with the proper params if specified
+    def return_uri(path, limit=nil, offset=nil, full_document=nil)
         uri = URI(@host_url+path)
-        params = { "limit" => limit, :"offset" => offset}
-        uri.query = URI.encode_www_form(params)
+        if limit!=nil && offset!=nil
+            if full_document!=nil
+                params = { :"full_document" => true, :"limit" => limit, :"offset" => offset}
+                uri.query = URI.encode_www_form(params)
+            else
+                params = { "limit" => limit, :"offset" => offset}
+                uri.query = URI.encode_www_form(params)
+            end
+        end
         uri
     end
     
-    def return_uri_full_document(path, limit, offset)
-        uri = URI(@host_url+path)
-        params = { :"full_document" => true, :"limit" => limit, :"offset" => offset}
-        uri.query = URI.encode_www_form(params)
-        uri
-    end
-    
-    def return_uri(path)
-        uri = URI(@host_url+path)
-        uri
-    end
-    
-    def get_resource(path)
+    #base function to GET a resource with the proper params if specified
+    def get_resource(path, limit=nil, offset=nil, full_document=nil)
         check_string(path)
-        uri = return_uri(path)
+        if (limit==nil) && (offset==nil)
+            uri = return_uri(path)
+        elsif full_document==nil
+            uri = return_uri(path, limit, offset)
+        else
+            uri = return_uri(path, limit, offset, full_document)
+        end
         req = Net::HTTP::Get.new(uri.path)
         if @customer_id == "Bearer "
             req.add_field("Authorization", @customer_id+@customer_key)
-            else
+        else
             req.basic_auth @customer_id, @customer_key
         end
         res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
@@ -133,76 +150,44 @@ class ChinoBaseAPI < CheckValues
         }
         parse_response(res)['data']
     end
-    
-    def get_resource_with_params(path, limit, offset)
+
+    #base function to POST a resource with the proper params if specified
+    def post_resource(path, data=nil, limit=nil, offset=nil, full_document=nil)
         check_string(path)
-        uri = return_uri_with_params(path, limit, offset)
-        req = Net::HTTP::Get.new(uri)
-        if @customer_id == "Bearer "
-            req.add_field("Authorization", @customer_id+@customer_key)
-            else
-            req.basic_auth @customer_id, @customer_key
+        if (limit==nil) && (offset==nil)
+            uri = return_uri(path)
+        elsif full_document==nil
+            uri = return_uri(path, limit, offset)
+        else
+            uri = return_uri(path, limit, offset, full_document)
         end
-        res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
-            http.request(req)
-        }
-        parse_response(res)['data']
-    end
-    
-    def get_full_content_documents(path, limit, offset)
-        check_string(path)
-        uri = return_uri_full_document(path, limit, offset)
-        req = Net::HTTP::Get.new(uri)
-        if @customer_id == "Bearer "
-            req.add_field("Authorization", @customer_id+@customer_key)
-            else
-            req.basic_auth @customer_id, @customer_key
-        end
-        res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
-            http.request(req)
-        }
-        parse_response(res)['data']
-    end
-    
-    def post_resource(path, data)
-        check_string(path)
-        uri = return_uri(path)
         req = Net::HTTP::Post.new(uri.path)
         if @customer_id == "Bearer "
             req.add_field("Authorization", @customer_id+@customer_key)
-            else
+        else
             req.basic_auth @customer_id, @customer_key
         end
-        req.body = data
+        if data!=nil
+            req.body = data
+        end
         res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
             http.request(req)
         }
-        parse_response(res)['data']
-    end
-    
-    def post_resource_with_params(path, data, limit, offset)
-        check_string(path)
-        uri = return_uri_with_params(path, limit, offset)
-        req = Net::HTTP::Post.new(uri.path)
-        if @customer_id == "Bearer "
-            req.add_field("Authorization", @customer_id+@customer_key)
-            else
-            req.basic_auth @customer_id, @customer_key
+        if data!=nil
+            parse_response(res)['data']
+        else
+            JSON.parse(parse_response(res).to_json)['result']
         end
-        req.body = data
-        res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
-            http.request(req)
-        }
-        parse_response(res)['data']
     end
     
+    #base function to POST a resource with string result
     def post_resource_with_string_result(path, data)
         check_string(path)
         uri = return_uri(path)
         req = Net::HTTP::Post.new(uri.path)
         if @customer_id == "Bearer "
             req.add_field("Authorization", @customer_id+@customer_key)
-            else
+        else
             req.basic_auth @customer_id, @customer_key
         end
         req.body = data
@@ -211,29 +196,15 @@ class ChinoBaseAPI < CheckValues
         }
         JSON.parse(parse_response(res).to_json)['result']
     end
-    
-    def post_resource_with_no_data(path)
-        check_string(path)
-        uri = return_uri(path)
-        req = Net::HTTP::Post.new(uri.path)
-        if @customer_id == "Bearer "
-            req.add_field("Authorization", @customer_id+@customer_key)
-            else
-            req.basic_auth @customer_id, @customer_key
-        end
-        res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
-            http.request(req)
-        }
-        JSON.parse(parse_response(res).to_json)['result']
-    end
-    
+
+    #base function to PUT a resource
     def put_resource(path, data)
         check_string(path)
         uri = return_uri(path)
         req = Net::HTTP::Put.new(uri.path)
         if @customer_id == "Bearer "
             req.add_field("Authorization", @customer_id+@customer_key)
-            else
+        else
             req.basic_auth @customer_id, @customer_key
         end
         req.body = data
@@ -243,13 +214,14 @@ class ChinoBaseAPI < CheckValues
         parse_response(res)['data']
     end
     
+    #base function to PATCH a resource
     def patch_resource(path, data)
         check_string(path)
         uri = return_uri(path)
         req = Net::HTTP::Patch.new(uri.path)
         if @customer_id == "Bearer "
             req.add_field("Authorization", @customer_id+@customer_key)
-            else
+        else
             req.basic_auth @customer_id, @customer_key
         end
         req.body = data
@@ -259,18 +231,19 @@ class ChinoBaseAPI < CheckValues
         parse_response(res)['data']
     end
     
+    #base function to DELETE a resource
     def delete_resource(path, force)
         check_string(path)
         check_boolean(force)
         if force
             uri = return_uri(path+"?force=true")
-            else
+        else
             uri = return_uri(path)
         end
         req = Net::HTTP::Delete.new(uri)
         if @customer_id == "Bearer "
             req.add_field("Authorization", @customer_id+@customer_key)
-            else
+        else
             req.basic_auth @customer_id, @customer_key
         end
         res = Net::HTTP.start(uri.hostname, uri.port, :use_ssl => true) {|http|
@@ -279,6 +252,7 @@ class ChinoBaseAPI < CheckValues
         JSON.parse(parse_response(res).to_json)['result']
     end
     
+    #base function to parse the response and raise "chino" errors if problems occurred
     def parse_response(response, raw=false)
         if response.is_a?(Net::HTTPServerError)
             raise ChinoError.new("Chino Server Error: #{response} - #{response.body}", response)
@@ -312,6 +286,7 @@ end
 
 #------------------------------CHINO ERRORS-----------------------------------#
 
+#Class for defining common errors
 class ChinoError < RuntimeError
     attr_accessor :http_response, :error, :user_error
     
@@ -327,23 +302,8 @@ class ChinoError < RuntimeError
     end
 end
 
+#Class for defining auth errors
 class ChinoAuthError < ChinoError
-end
-
-class ChinoErrorModel
-    include ActiveModel::Serializers::JSON
-    
-    attr_accessor :message, :data, :result, :result_code
-    
-    def attributes=(hash)
-        hash.each do |key, value|
-            send("#{key}=", value)
-        end
-    end
-    
-    def attributes
-        instance_values
-    end
 end
 
 #------------------------------APPLICATIONS-----------------------------------#
@@ -389,25 +349,13 @@ class Applications < ChinoBaseAPI
         app
     end
     
-    def list_applications()
+    def list_applications(limit=nil, offset=nil)
         apps = GetApplicationsResponse.new
-        apps.from_json(get_resource_with_params("/auth/applications", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
-        as = apps.applications
-        apps.applications = []
-        as.each do |a|
-            app = Application.new
-            app.app_id = a['app_id']
-            app.app_name = a['app_name']
-            apps.applications.push(app)
+        if limit==nil && offset==nil
+          apps.from_json(get_resource("/auth/applications", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        else
+          apps.from_json(get_resource("/auth/applications", limit, offset).to_json)
         end
-        apps
-    end
-    
-    def list_applications_with_params(limit, offset)
-        check_int(limit)
-        check_int(offset)
-        apps = GetApplicationsResponse.new
-        apps.from_json(get_resource_with_params("/auth/applications", limit, offset).to_json)
         as = apps.applications
         apps.applications = []
         as.each do |a|
@@ -467,7 +415,7 @@ end
 
 class Auth < ChinoBaseAPI
     
-    def loginWithPassword(username, password, application_id, application_secret)
+    def login_password(username, password, application_id, application_secret)
         check_string(username)
         check_string(password)
         check_string(application_id)
@@ -484,7 +432,7 @@ class Auth < ChinoBaseAPI
         usr
     end
     
-    def loginWithAuthenticationCode(code, redirect_url, application_id, application_secret)
+    def login_authentication_code(code, redirect_url, application_id, application_secret)
         check_string(code)
         check_string(redirect_url)
         check_string(application_id)
@@ -501,7 +449,7 @@ class Auth < ChinoBaseAPI
         usr
     end
     
-    def refreshToken(refresh_token, application_id, application_secret)
+    def refresh_token(refresh_token, application_id, application_secret)
         check_string(refresh_token)
         check_string(application_id)
         check_string(application_secret)
@@ -576,24 +524,13 @@ class Repositories < ChinoBaseAPI
         repo
     end
     
-    def list_repositories()
+    def list_repositories(limit=nil, offset=nil)
         repos = GetRepositoriesResponse.new
-        repos.from_json(get_resource_with_params("/repositories", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
-        rs = repos.repositories
-        repos.repositories = []
-        rs.each do |r|
-            repo = Repository.new
-            repo.from_json(r.to_json)
-            repos.repositories.push(repo)
+        if limit==nil && offset==nil
+          repos.from_json(get_resource("/repositories", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        else
+          repos.from_json(get_resource("/repositories", limit, offset).to_json)
         end
-        repos
-    end
-    
-    def list_repositories_with_params(limit, offset)
-        check_int(limit)
-        check_int(offset)
-        repos = GetRepositoriesResponse.new
-        repos.from_json(get_resource_with_params("/repositories", limit, offset).to_json)
         rs = repos.repositories
         repos.repositories = []
         rs.each do |r|
@@ -679,24 +616,13 @@ class UserSchemas < ChinoBaseAPI
         u
     end
     
-    def list_user_schemas()
+    def list_user_schemas(limit=nil, offset=nil)
         schemas = GetUserSchemasResponse.new
-        schemas.from_json(get_resource_with_params("/user_schemas", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
-        us = schemas.user_schemas
-        schemas.user_schemas = []
-        us.each do |u|
-            schema = UserSchema.new
-            schema.from_json(u.to_json)
-            schemas.user_schemas.push(schema)
+        if limit==nil && offset==nil
+          schemas.from_json(get_resource("/user_schemas", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        else
+          schemas.from_json(get_resource("/user_schemas", limit, offset).to_json)
         end
-        schemas
-    end
-    
-    def list_applications_with_params(limit, offset)
-        check_int(limit)
-        check_int(offset)
-        schemas = GetUserSchemasResponse.new
-        schemas.from_json(get_resource_with_params("/user_schemas", limit, offset).to_json)
         us = schemas.user_schemas
         schemas.user_schemas = []
         us.each do |u|
@@ -780,26 +706,14 @@ class Users < ChinoBaseAPI
         u
     end
     
-    def list_users(user_schema_id)
+    def list_users(user_schema_id, limit=nil, offset=nil)
         check_string(user_schema_id)
         users = GetUsersResponse.new
-        users.from_json(get_resource_with_params("/user_schemas/#{user_schema_id}/users", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
-        us = users.users
-        users.users = []
-        us.each do |u|
-            user = User.new
-            user.from_json(u.to_json)
-            users.users.push(user)
+        if limit==nil && offset==nil
+          users.from_json(get_resource("/user_schemas/#{user_schema_id}/users", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        else
+          users.from_json(get_resource("/user_schemas/#{user_schema_id}/users", limit, offset).to_json)
         end
-        users
-    end
-    
-    def list_users_with_params(user_schema_id, limit, offset)
-        check_string(user_schema_id)
-        check_int(limit)
-        check_int(offset)
-        users = GetUsersResponse.new
-        users.from_json(get_resource_with_params("/user_schemas/#{user_schema_id}/users", limit, offset).to_json)
         us = users.users
         users.users = []
         us.each do |u|
@@ -895,24 +809,13 @@ class Groups < ChinoBaseAPI
         g
     end
     
-    def list_groups()
+    def list_groups(limit=nil, offset=nil)
         groups = GetGroupsResponse.new
-        groups.from_json(get_resource_with_params("/groups", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
-        gs = groups.groups
-        groups.groups = []
-        gs.each do |g|
-            group = Group.new
-            group.from_json(g.to_json)
-            groups.groups.push(group)
+        if limit==nil && offset==nil
+          groups.from_json(get_resource("/groups", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        else
+          groups.from_json(get_resource("/groups", limit, offset).to_json)
         end
-        groups
-    end
-    
-    def list_groups_with_params(limit, offset)
-        check_int(limit)
-        check_int(offset)
-        groups = GetGroupsResponse.new
-        groups.from_json(get_resource_with_params("/groups", limit, offset).to_json)
         gs = groups.groups
         groups.groups = []
         gs.each do |g|
@@ -951,13 +854,13 @@ class Groups < ChinoBaseAPI
     def add_user_to_group(user_id, group_id)
         check_string(group_id)
         check_string(user_id)
-        post_resource_with_no_data("/groups/#{group_id}/users/#{user_id}")
+        post_resource("/groups/#{group_id}/users/#{user_id}")
     end
     
     def add_user_schema_to_group(user_schema_id, group_id)
         check_string(group_id)
         check_string(user_schema_id)
-        post_resource_with_no_data("/groups/#{group_id}/user_schemas/#{user_schema_id}")
+        post_resource("/groups/#{group_id}/user_schemas/#{user_schema_id}")
     end
     
     def remove_user_from_group(user_id, group_id)
@@ -1020,26 +923,14 @@ class Schemas < ChinoBaseAPI
         s
     end
     
-    def list_schemas(repository_id)
+    def list_schemas(repository_id, limit=nil, offset=nil)
         check_string(repository_id)
         schemas = GetSchemasResponse.new
-        schemas.from_json(get_resource_with_params("/repositories/#{repository_id}/schemas", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
-        ss = schemas.schemas
-        schemas.schemas = []
-        ss.each do |s|
-            schema = Schema.new
-            schema.from_json(s.to_json)
-            schemas.schemas.push(schema)
+        if limit==nil && offset==nil
+          schemas.from_json(get_resource("/repositories/#{repository_id}/schemas", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        else
+          schemas.from_json(get_resource("/repositories/#{repository_id}/schemas", limit, offset).to_json)
         end
-        schemas
-    end
-    
-    def list_applications_with_params(repository_id, limit, offset)
-        check_string(repository_id)
-        check_int(limit)
-        check_int(offset)
-        schemas = GetSchemasResponse.new
-        schemas.from_json(get_resource_with_params("/repositories/#{repository_id}/schemas", limit, offset).to_json)
         ss = schemas.schemas
         schemas.schemas = []
         ss.each do |s|
@@ -1128,35 +1019,22 @@ class Documents < ChinoBaseAPI
         d
     end
     
-    def list_documents(schema_id, full_document)
+    def list_documents(schema_id, full_document, limit=nil, offset=nil)
         check_string(schema_id)
         check_boolean(full_document)
         docs = GetDocumentsResponse.new
-        if full_document
-            docs.from_json(get_full_content_documents("/schemas/#{schema_id}/documents", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
-            else
-            docs.from_json(get_resource_with_params("/schemas/#{schema_id}/documents", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
-        end
-        ds = docs.documents
-        docs.documents = []
-        ds.each do |d|
-            doc = Document.new
-            doc.from_json(d.to_json)
-            docs.documents.push(doc)
-        end
-        docs
-    end
-    
-    def list_documents_with_params(schema_id, full_document, limit, offset)
-        check_string(schema_id)
-        check_boolean(full_document)
-        check_int(limit)
-        check_int(offset)
-        docs = GetDocumentsResponse.new
-        if full_document
-            docs.from_json(get_full_content_documents("/schemas/#{schema_id}/documents", limit, offset).to_json)
-            else
-            docs.from_json(get_resource_with_params("/schemas/#{schema_id}/documents", limit, offset).to_json)
+        if limit==nil && offset==nil
+          if full_document
+              docs.from_json(get_resource("/schemas/#{schema_id}/documents", ChinoRuby::QUERY_DEFAULT_LIMIT, 0, true).to_json)
+          else
+              docs.from_json(get_resource("/schemas/#{schema_id}/documents", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+          end
+        else
+          if full_document
+            docs.from_json(get_resource("/schemas/#{schema_id}/documents", limit, offset, true).to_json)
+          else
+            docs.from_json(get_resource("/schemas/#{schema_id}/documents", limit, offset).to_json)
+          end
         end
         ds = docs.documents
         docs.documents = []
@@ -1240,30 +1118,19 @@ class Collections < ChinoBaseAPI
         col
     end
     
-    def list_collections()
+    def list_collections(limit=nil, offset=nil)
         cols = GetCollectionsResponse.new
-        cols.from_json(get_resource_with_params("/collections", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        if limit==nil && offset==nil
+         cols.from_json(get_resource("/collections", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        else
+          cols.from_json(get_resource("/collections", limit, offset).to_json)
+        end
         cs = cols.collections
         cols.collections = []
         cs.each do |c|
             col = Collection.new
             col.from_json(c.to_json)
             cols.collections.push(col)
-        end
-        cols
-    end
-    
-    def list_repositories_with_params(limit, offset)
-        check_int(limit)
-        check_int(offset)
-        cols = GetCollectionsResponse.new
-        cols.from_json(get_resource_with_params("/collections", limit, offset).to_json)
-        cs = cols.collections
-        cols.collections = []
-        cs.each do |c|
-            col = Collection.new
-            col.from_json(c.to_json)
-            cols.repositories.push(col)
         end
         cols
     end
@@ -1294,7 +1161,7 @@ class Collections < ChinoBaseAPI
     def add_document(document_id, collection_id)
         check_string(document_id)
         check_string(collection_id)
-        post_resource_with_no_data("/collections/#{collection_id}/documents/#{document_id}")
+        post_resource("/collections/#{collection_id}/documents/#{document_id}")
     end
     
     def remove_document(document_id, collection_id)
@@ -1303,24 +1170,14 @@ class Collections < ChinoBaseAPI
         delete_resource("/collections/#{collection_id}/documents/#{document_id}", false)
     end
     
-    def list_documents(collection_id)
+    def list_documents(collection_id, limit=nil, offset=nil)
         check_string(collection_id)
         docs = GetDocumentsResponse.new
-        docs.from_json(get_resource_with_params("/collections/#{collection_id}/documents", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
-        ds = docs.documents
-        docs.documents = []
-        ds.each do |d|
-            doc = Document.new
-            doc.from_json(d.to_json)
-            docs.documents.push(doc)
+        if limit==nil && offset==nil
+          docs.from_json(get_resource("/collections/#{collection_id}/documents", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        else
+          docs.from_json(get_resource("/collections/#{collection_id}/documents", limit, offset).to_json)
         end
-        docs
-    end
-    
-    def list_documents_with_params(collection_id, limit, offset)
-        check_string(collection_id)
-        docs = GetDocumentsResponse.new
-        docs.from_json(get_resource_with_params("/collections/#{collection_id}/documents", limit, offset).to_json)
         ds = docs.documents
         docs.documents = []
         ds.each do |d|
@@ -1367,9 +1224,13 @@ class GetPermissionsResponse
 end
 
 class Permissions < ChinoBaseAPI
-    def read_permissions()
+    def list_permissions(limit=nil, offset=nil)
         perms = GetPermissionsResponse.new
-        perms.from_json(get_resource_with_params("/perms", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        if limit==nil && offset==nil
+          perms.from_json(get_resource("/perms", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        else
+          perms.from_json(get_resource("/perms", limit, offset).to_json)
+        end
         ps = perms.permissions
         perms.permissions = []
         ps.each do |p|
@@ -1380,25 +1241,14 @@ class Permissions < ChinoBaseAPI
         perms
     end
     
-    def read_permissions_with_params(limit, offset)
-        check_int(limit)
-        check_int(offset)
-        perms = GetPermissionsResponse.new
-        perms.from_json(get_resource_with_params("/perms", limit, offset).to_json)
-        ps = perms.permissions
-        perms.permissions = []
-        ps.each do |p|
-            perm = Permission.new
-            perm.from_json(p.to_json)
-            perms.permissions.push(perm)
-        end
-        perms
-    end
-    
-    def read_permissions_on_a_document(document_id)
+    def read_permissions_on_a_document(document_id, limit=nil, offset=nil)
         check_string(document_id)
         perms = GetPermissionsResponse.new
-        perms.from_json(get_resource_with_params("/perms/documents/#{document_id}", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        if limit==nil && offset==nil
+          perms.from_json(get_resource("/perms/documents/#{document_id}", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        else
+          perms.from_json(get_resource("/perms/documents/#{document_id}", limit, offset).to_json)
+        end
         ps = perms.permissions
         perms.permissions = []
         ps.each do |p|
@@ -1409,26 +1259,14 @@ class Permissions < ChinoBaseAPI
         perms
     end
     
-    def read_permissions_on_a_document_with_params(document_id, limit, offset)
-        check_int(limit)
-        check_int(offset)
-        check_string(document_id)
-        perms = GetPermissionsResponse.new
-        perms.from_json(get_resource_with_params("/perms/documents/#{document_id}", limit, offset).to_json)
-        ps = perms.permissions
-        perms.permissions = []
-        ps.each do |p|
-            perm = Permission.new
-            perm.from_json(p.to_json)
-            perms.permissions.push(perm)
-        end
-        perms
-    end
-    
-    def read_permissions_of_a_user(user_id)
+    def read_permissions_of_a_user(user_id, limit=nil, offset=nil)
         check_string(user_id)
         perms = GetPermissionsResponse.new
-        perms.from_json(get_resource_with_params("/perms/users/#{user_id}", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        if limit==nil && offset==nil
+          perms.from_json(get_resource("/perms/users/#{user_id}", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        else
+          perms.from_json(get_resource("/perms/users/#{user_id}", limit, offset).to_json)
+        end
         ps = perms.permissions
         perms.permissions = []
         ps.each do |p|
@@ -1439,42 +1277,14 @@ class Permissions < ChinoBaseAPI
         perms
     end
     
-    def read_permissions_of_a_user_with_params(user_id, limit, offset)
-        check_int(limit)
-        check_int(offset)
-        check_string(user_id)
-        perms = GetPermissionsResponse.new
-        perms.from_json(get_resource_with_params("/perms/users/#{user_id}", limit, offset).to_json)
-        ps = perms.permissions
-        perms.permissions = []
-        ps.each do |p|
-            perm = Permission.new
-            perm.from_json(p.to_json)
-            perms.permissions.push(perm)
-        end
-        perms
-    end
-    
-    def read_permissions_of_a_group(group_id)
+    def read_permissions_of_a_group(group_id, limit=nil, offset=nil)
         check_string(group_id)
         perms = GetPermissionsResponse.new
-        perms.from_json(get_resource_with_params("/perms/groups/#{group_id}", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
-        ps = perms.permissions
-        perms.permissions = []
-        ps.each do |p|
-            perm = Permission.new
-            perm.from_json(p.to_json)
-            perms.permissions.push(perm)
+        if limit==nil && offset==nil
+          perms.from_json(get_resource("/perms/groups/#{group_id}", ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        else
+          perms.from_json(get_resource("/perms/groups/#{group_id}", limit, offset).to_json)
         end
-        perms
-    end
-    
-    def read_permissions_of_a_group_with_params(group_id, limit, offset)
-        check_int(limit)
-        check_int(offset)
-        check_string(group_id)
-        perms = GetPermissionsResponse.new
-        perms.from_json(get_resource_with_params("/perms/groups/#{group_id}", limit, offset).to_json)
         ps = perms.permissions
         perms.permissions = []
         ps.each do |p|
@@ -1551,7 +1361,7 @@ class FilterOption < CheckValues
     end
     
     def to_json
-        return {"field": field, "type": type, "value": value}.to_json
+        {"field": field, "type": type, "value": value}.to_json
     end
 end
 
@@ -1566,12 +1376,12 @@ class SortOption < CheckValues
     end
     
     def to_json
-        return {"field": field, "order": order}.to_json
+        {"field": field, "order": order}.to_json
     end
 end
 
 class Search < ChinoBaseAPI
-    def search_documents(schema_id, result_type, filter_type, sort, filter)
+    def search_documents(schema_id, result_type, filter_type, sort, filter, limit=nil, offset=nil)
         check_string(schema_id)
         check_string(result_type)
         check_string(filter_type)
@@ -1579,7 +1389,11 @@ class Search < ChinoBaseAPI
         check_json(filter)
         data = {"result_type": result_type, "filter_type": filter_type, "filter": filter, "sort": sort}.to_json
         docs = GetDocumentsResponse.new
-        docs.from_json(post_resource_with_params("/search/documents/#{schema_id}", data, ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        if limit==nil && offset==nil
+          docs.from_json(post_resource("/search/documents/#{schema_id}", data, ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        else
+          docs.from_json(post_resource("/search/documents/#{schema_id}", data, limit, offset).to_json)
+        end
         ds = docs.documents
         docs.documents = []
         ds.each do |d|
@@ -1590,26 +1404,7 @@ class Search < ChinoBaseAPI
         docs
     end
     
-    def search_documents_with_params(schema_id, result_type, filter_type, sort, filter, limit, offset)
-        check_string(schema_id)
-        check_string(result_type)
-        check_string(filter_type)
-        check_json(sort)
-        check_json(filter)
-        data = {"result_type": result_type, "filter_type": filter_type, "filter": filter, "sort": sort}.to_json
-        docs = GetDocumentsResponse.new
-        docs.from_json(post_resource_with_params("/search/documents/#{schema_id}", data, limit, offset).to_json)
-        ds = docs.documents
-        docs.documents = []
-        ds.each do |d|
-            doc = Document.new
-            doc.from_json(d.to_json)
-            docs.documents.push(doc)
-        end
-        docs
-    end
-    
-    def search_users(user_schema_id, result_type, filter_type, sort, filter)
+    def search_users(user_schema_id, result_type, filter_type, sort, filter, limit=nil, offset=nil)
         check_string(user_schema_id)
         check_string(result_type)
         check_string(filter_type)
@@ -1617,26 +1412,11 @@ class Search < ChinoBaseAPI
         check_json(filter)
         data = {"result_type": result_type, "filter_type": filter_type, "filter": filter, "sort": sort}.to_json
         users = GetUsersResponse.new
-        users.from_json(post_resource_with_params("/search/users/#{user_schema_id}", data, ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
-        us = users.users
-        users.users = []
-        us.each do |u|
-            user = User.new
-            user.from_json(u.to_json)
-            users.users.push(user)
+        if limit==nil && offset==nil
+          users.from_json(post_resource("/search/users/#{user_schema_id}", data, ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+        else
+          users.from_json(post_resource("/search/users/#{user_schema_id}", data, limit, offset).to_json)
         end
-        users
-    end
-    
-    def search_users_with_params(user_schema_id, result_type, filter_type, sort, filter, limit, offset)
-        check_string(user_schema_id)
-        check_string(result_type)
-        check_string(filter_type)
-        check_json(sort)
-        check_json(filter)
-        data = {"result_type": result_type, "filter_type": filter_type, "filter": filter, "sort": sort}.to_json
-        users = GetUsersResponse.new
-        users.from_json(post_resource_with_params("/search/users/#{user_schema_id}", data, limit, offset).to_json)
         us = users.users
         users.users = []
         us.each do |u|
@@ -1710,7 +1490,8 @@ class Blobs < ChinoBaseAPI
         blob = init_upload(filename, document_id, field)
         bytes = []
         offset = 0
-        File.open(path+filename, 'rb') { |file|
+        file_path = File.join File.expand_path("..", File.dirname(__FILE__)), path, filename
+        File.open(file_path, 'rb') { |file|
             while (buffer = file.read(chunk_size)) do
                 upload_chunk(blob.upload_id, buffer, offset)
                 offset = offset+buffer.length
@@ -1775,7 +1556,9 @@ class Blobs < ChinoBaseAPI
         filename = res.header['Content-Disposition'].partition('=').last
         blob.filename = filename
         blob.path = destination
-        File.open(destination+filename, 'wb') { |file|
+        path = File.join File.expand_path("..", File.dirname(__FILE__)), destination
+        FileUtils.mkdir_p(path) unless File.exist?(path)
+        File.open(File.join(path+filename), 'wb') { |file|
             file << res.body
             blob.md5 = (Digest::MD5.file file).hexdigest
             blob.sha1 = (Digest::SHA1.file file).hexdigest
