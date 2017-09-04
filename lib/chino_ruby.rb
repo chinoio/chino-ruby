@@ -699,6 +699,12 @@ end
 
 class Users < ChinoBaseAPI
     
+    def me
+        u = User.new
+        u.from_json(get_resource("/users/me").to_json, true)
+        u
+    end
+    
     def get_user(user_id)
         check_string(user_id)
         u = User.new

@@ -25,3 +25,4 @@
 *.gem
 pkg/
 .idea/
+config-chino.yml

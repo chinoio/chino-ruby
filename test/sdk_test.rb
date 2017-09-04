@@ -596,6 +596,11 @@ class SDKTest < Test::Unit::TestCase
        assert_not_equal(l_usr.token_type, "")
 
        @client = ChinoAPI.new("Bearer ", l_usr.access_token, @DEVELOPMENT_KEYS['url'])
+
+       usr = @client.users.me
+       assert_equal(usr.user_attributes['test_string'], "sample value ruby")
+       assert_equal(usr.user_attributes['test_integer'], 123)
+       assert_not_equal(usr.user_id, "")
        
        assert_equal(@client.auth.logout(l_usr.access_token, app.app_id, app.app_secret), @success)
        

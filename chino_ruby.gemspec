@@ -5,7 +5,7 @@ require "chino_ruby/version"
 
 Gem::Specification.new do |spec|
   spec.name          = "chino_ruby"
-  spec.version       = '1.2'
+  spec.version       = '1.3'
   spec.authors       = ["Paolo Prem"]
   spec.email         = ["prempaolo@gmail.com"]
 
