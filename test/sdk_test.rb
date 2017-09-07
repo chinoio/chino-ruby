@@ -7,8 +7,7 @@ class SDKTest < Test::Unit::TestCase
        @RAILS_ROOT = File.join(File.dirname(__FILE__), '../')
        @KEYS = YAML::load(File.open("#{@RAILS_ROOT}/config-chino.yml"))
        
-       @DEVELOPMENT_KEYS = @KEYS['development_old']
-       #@DEVELOPMENT_KEYS = @KEYS['development']
+       @DEVELOPMENT_KEYS = @KEYS['development']
        
        @client = ChinoAPI.new(@DEVELOPMENT_KEYS['customer_id'], @DEVELOPMENT_KEYS['customer_key'], @DEVELOPMENT_KEYS['url'])
        @success = "success"
