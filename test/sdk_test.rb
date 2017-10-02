@@ -64,9 +64,9 @@ class SDKTest < Test::Unit::TestCase
        assert_not_equal(repo.repository_id, "")
        
        fields = []
-       fields.push(Field.new("string", "test_string", true))
-       fields.push(Field.new("integer", "test_integer", true))
-       fields.push(Field.new("blob", "test_blob", false))
+       fields.push(ChinoRuby::Field.new("string", "test_string", true))
+       fields.push(ChinoRuby::Field.new("integer", "test_integer", true))
+       fields.push(ChinoRuby::Field.new("blob", "test_blob", false))
        
        description = "test-schema-description-ruby"
        
@@ -104,9 +104,9 @@ class SDKTest < Test::Unit::TestCase
        assert_not_equal(repo.repository_id, "")
        
        fields = []
-       fields.push(Field.new("string", "test_string", true))
-       fields.push(Field.new("integer", "test_integer", true))
-       fields.push(Field.new("blob", "test_blob", false))
+       fields.push(ChinoRuby::Field.new("string", "test_string", true))
+       fields.push(ChinoRuby::Field.new("integer", "test_integer", true))
+       fields.push(ChinoRuby::Field.new("blob", "test_blob", false))
        
        description = "test-schema-description-ruby"
        
@@ -156,8 +156,8 @@ class SDKTest < Test::Unit::TestCase
        description = "test-user-schema-description-ruby"
        description_updated = "test-user-schema-description-ruby-updated"
        fields = []
-       fields.push(Field.new("string", "test_string", true))
-       fields.push(Field.new("integer", "test_integer", true))
+       fields.push(ChinoRuby::Field.new("string", "test_string", true))
+       fields.push(ChinoRuby::Field.new("integer", "test_integer", true))
        
        u_schema = @client.user_schemas.create_user_schema(description, fields)
        assert_equal(u_schema.description, description)
@@ -184,8 +184,8 @@ class SDKTest < Test::Unit::TestCase
    def test_users
        description = "test-user-schema-description-ruby"
        fields = []
-       fields.push(Field.new("string", "test_string", true))
-       fields.push(Field.new("integer", "test_integer", true))
+       fields.push(ChinoRuby::Field.new("string", "test_string", true))
+       fields.push(ChinoRuby::Field.new("integer", "test_integer", true))
        
        u_schema = @client.user_schemas.create_user_schema(description, fields)
        assert_equal(u_schema.description, description)
@@ -234,8 +234,8 @@ class SDKTest < Test::Unit::TestCase
    def test_groups
        description = "test-user-schema-description-ruby"
        fields = []
-       fields.push(Field.new("string", "test_string", true))
-       fields.push(Field.new("integer", "test_integer", true))
+       fields.push(ChinoRuby::Field.new("string", "test_string", true))
+       fields.push(ChinoRuby::Field.new("integer", "test_integer", true))
        
        u_schema = @client.user_schemas.create_user_schema(description, fields)
        assert_equal(u_schema.description, description)
@@ -304,9 +304,9 @@ class SDKTest < Test::Unit::TestCase
        assert_not_equal(repo.repository_id, "")
        
        fields = []
-       fields.push(Field.new("string", "test_string", true))
-       fields.push(Field.new("integer", "test_integer", true))
-       fields.push(Field.new("blob", "test_blob", false))
+       fields.push(ChinoRuby::Field.new("string", "test_string", true))
+       fields.push(ChinoRuby::Field.new("integer", "test_integer", true))
+       fields.push(ChinoRuby::Field.new("blob", "test_blob", false))
        
        description = "test-schema-description-ruby"
        
@@ -363,9 +363,9 @@ class SDKTest < Test::Unit::TestCase
        assert_not_equal(repo.repository_id, "")
        
        fields = []
-       fields.push(Field.new("string", "test_string", true))
-       fields.push(Field.new("integer", "test_integer", true))
-       fields.push(Field.new("blob", "test_blob", false))
+       fields.push(ChinoRuby::Field.new("string", "test_string", true))
+       fields.push(ChinoRuby::Field.new("integer", "test_integer", true))
+       fields.push(ChinoRuby::Field.new("blob", "test_blob", false))
        
        description = "test-schema-description-ruby"
        
@@ -383,8 +383,8 @@ class SDKTest < Test::Unit::TestCase
        
        description = "test-user-schema-description-ruby"
        fields = []
-       fields.push(Field.new("string", "test_string", true))
-       fields.push(Field.new("integer", "test_integer", true))
+       fields.push(ChinoRuby::Field.new("string", "test_string", true))
+       fields.push(ChinoRuby::Field.new("integer", "test_integer", true))
        
        u_schema = @client.user_schemas.create_user_schema(description, fields)
        assert_equal(u_schema.description, description)
@@ -433,9 +433,9 @@ class SDKTest < Test::Unit::TestCase
        assert_not_equal(repo.repository_id, "")
        
        fields = []
-       fields.push(Field.new("string", "test_string", true))
-       fields.push(Field.new("integer", "test_integer", true))
-       fields.push(Field.new("blob", "test_blob", false))
+       fields.push(ChinoRuby::Field.new("string", "test_string", true))
+       fields.push(ChinoRuby::Field.new("integer", "test_integer", true))
+       fields.push(ChinoRuby::Field.new("blob", "test_blob", false))
        
        description = "test-schema-description-ruby"
        
@@ -453,8 +453,8 @@ class SDKTest < Test::Unit::TestCase
        
        description = "test-user-schema-description-ruby"
        fields = []
-       fields.push(Field.new("string", "test_string", true))
-       fields.push(Field.new("integer", "test_integer", true))
+       fields.push(ChinoRuby::Field.new("string", "test_string", true))
+       fields.push(ChinoRuby::Field.new("integer", "test_integer", true))
        
        u_schema = @client.user_schemas.create_user_schema(description, fields)
        assert_equal(u_schema.description, description)
@@ -475,11 +475,11 @@ class SDKTest < Test::Unit::TestCase
        sleep(3)
        
        sort = []
-       sort.push(SortOption.new("test_string", "asc"))
+       sort.push(ChinoRuby::SortOption.new("test_string", "asc"))
        
        filter = []
-       filter.push(FilterOption.new("test_string", "eq", "sample value ruby"))
-       filter.push(FilterOption.new("test_integer", "eq", 1233))
+       filter.push(ChinoRuby::FilterOption.new("test_string", "eq", "sample value ruby"))
+       filter.push(ChinoRuby::FilterOption.new("test_integer", "eq", 1233))
        
        docs = @client.search.search_documents(schema.schema_id, "FULL_CONTENT", "and", sort, filter)
        assert_equal(docs.documents.size, 1)
@@ -489,11 +489,11 @@ class SDKTest < Test::Unit::TestCase
        end
        
        sort = []
-       sort.push(SortOption.new("test_string", "asc"))
+       sort.push(ChinoRuby::SortOption.new("test_string", "asc"))
        
        filter = []
-       filter.push(FilterOption.new("test_string", "eq", "sample value ruby"))
-       filter.push(FilterOption.new("test_integer", "eq", 666))
+       filter.push(ChinoRuby::FilterOption.new("test_string", "eq", "sample value ruby"))
+       filter.push(ChinoRuby::FilterOption.new("test_integer", "eq", 666))
        
        users = @client.search.search_users(u_schema.user_schema_id, "FULL_CONTENT", "and", sort, filter)
        assert_equal(users.users.size, 1)
@@ -514,35 +514,35 @@ class SDKTest < Test::Unit::TestCase
        repo = @client.repositories.create_repository(description)
        assert_equal(repo.description, description)
        assert_not_equal(repo.repository_id, "")
-       
+
        fields = []
-       fields.push(Field.new("string", "test_string", true))
-       fields.push(Field.new("integer", "test_integer", true))
-       fields.push(Field.new("blob", "test_blob", false))
-       
+       fields.push(ChinoRuby::Field.new("string", "test_string", true))
+       fields.push(ChinoRuby::Field.new("integer", "test_integer", true))
+       fields.push(ChinoRuby::Field.new("blob", "test_blob", false))
+
        description = "test-schema-description-ruby"
-       
+
        schema = @client.schemas.create_schema(repo.repository_id, description, fields)
        assert_equal(schema.description, description)
        assert_equal(schema.getFields.size, 3)
        assert_not_equal(schema.schema_id, "")
-       
+
        content = Hash.new
        content["test_string"] = "sample value ruby"
        content["test_integer"] = 1233
-       
+
        doc = @client.documents.create_document(schema.schema_id, content)
        assert_not_equal(doc.document_id, "")
-       
+
        filename = "Chino.io-eBook-Health-App-Compliance.pdf"
        path = "test/testfiles/"
-       
+
        blob = @client.blobs.upload_blob(path, filename, doc.document_id, "test_blob")
        assert_not_equal(blob.document_id, "")
        assert_not_equal(blob.blob_id, "")
-       
+
        output_path = "test/testfiles/output/"
-       
+
        getBlob = @client.blobs.get(blob.blob_id, output_path)
        assert_not_equal(getBlob.blob_id, "")
        assert_equal(getBlob.path, output_path)
@@ -550,7 +550,7 @@ class SDKTest < Test::Unit::TestCase
        #assert_equal(blob.size, getBlob.size)
        assert_equal(blob.sha1, getBlob.sha1)
        assert_equal(blob.md5, getBlob.md5)
-       
+
        assert_equal(@client.blobs.delete_blob(blob.blob_id, true), @success)
        assert_equal(@client.documents.delete_document(doc.document_id, true), @success)
        assert_equal(@client.schemas.delete_schema(schema.schema_id, true), @success)
@@ -560,8 +560,8 @@ class SDKTest < Test::Unit::TestCase
    def test_auth
        description = "test-user-schema-description-ruby"
        fields = []
-       fields.push(Field.new("string", "test_string", true))
-       fields.push(Field.new("integer", "test_integer", true))
+       fields.push(ChinoRuby::Field.new("string", "test_string", true))
+       fields.push(ChinoRuby::Field.new("integer", "test_integer", true))
        
        u_schema = @client.user_schemas.create_user_schema(description, fields)
        assert_equal(u_schema.description, description)
