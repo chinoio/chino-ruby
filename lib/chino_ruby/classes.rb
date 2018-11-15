@@ -93,7 +93,7 @@ module ChinoRuby
       else
         uri = return_uri(path, limit, offset, full_document)
       end
-      req = Net::HTTP::Get.new(uri.path)
+      req = Net::HTTP::Get.new(uri)
       if @customer_id == "Bearer "
         req.add_field("Authorization", @customer_id+@customer_key)
       else
