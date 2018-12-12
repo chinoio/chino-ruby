@@ -93,7 +93,7 @@ module ChinoRuby
       else
         uri = return_uri(path, limit, offset, full_document)
       end
-      req = Net::HTTP::Get.new(uri.path)
+      req = Net::HTTP::Get.new(uri)
       if @customer_id == "Bearer "
         req.add_field("Authorization", @customer_id+@customer_key)
       else
@@ -1495,8 +1495,9 @@ module ChinoRuby
       filename = res.header['Content-Disposition'].partition('=').last
       blob.filename = filename
       blob.path = destination
-      #FIXME: this is relative to the LIBRARY directory, not running app
-      file_path = File.join File.expand_path("../..", File.dirname(__FILE__)), destination
+      # FIXME: this is relative to the LIBRARY directory, not running app
+      # file_path = File.join File.expand_path("../..", File.dirname(__FILE__)), destination
+      file_path = File.join Dir.pwd, destination
       FileUtils.mkdir_p(file_path) unless File.exist?(file_path)
       File.open(File.join(file_path+filename), 'wb') { |file|
         file << res.body
