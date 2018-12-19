@@ -1342,6 +1342,65 @@ module ChinoRuby
       docs
     end
 
+    ##
+    # Document complex search accept a query hash, has documented here https://docs.chino.io/#header-complex-search
+    # query hash need to be converted to json
+    # e.g. to build this JSON query
+    # {
+    #   "and": [
+    #       {
+    #           "field": "user_id",
+    #           "type": "eq",
+    #           "value": "aaaaaaa"
+    #       },
+    #       {
+    #           "or": [
+    #               {
+    #                   "field": "first_name",
+    #                   "type": "like",
+    #                   "value": "*Mario*"
+    #               },
+    #               {
+    #                   "field": "last_name",
+    #                   "type": "like",
+    #                   "value": "*Mario*"
+    #               }
+    #           ]
+    #       }
+    #   ]
+    # }
+    #
+    # You can use code like this:
+    #
+    # query = { and: [] }
+    # query[:and] << ChinoFilterOption.new('user_id', 'eq', "aaaaaaa")
+    #
+    # or_conditions = { or: [] }
+    # or_conditions[:or] << ChinoFilterOption.new('first_name', 'like', "*Mario*")
+    # or_conditions[:or] << ChinoFilterOption.new('last_name', 'like', "*Mario*")
+    # query[:and] << or_conditions
+    def complex_search_documents(schema_id, result_type, sort, query, limit=nil, offset=nil)
+      check_string(schema_id)
+      check_string(result_type)
+      check_json(sort)
+      check_json(query)
+      data = {"result_type": result_type, "query": query, "sort": sort}.to_json
+      docs = GetDocumentsResponse.new
+      if limit==nil && offset==nil
+        docs.from_json(post_resource("/search/documents/#{schema_id}", data, ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
+      else
+        docs.from_json(post_resource("/search/documents/#{schema_id}", data, limit, offset).to_json)
+      end
+      ds = docs.documents
+      docs.documents = []
+      ds.each do |d|
+        doc = Document.new
+        doc.from_json(d.to_json)
+        docs.documents.push(doc)
+      end
+      docs
+    end
+
     def search_users(user_schema_id, result_type, filter_type, sort, filter, limit=nil, offset=nil)
       check_string(user_schema_id)
       check_string(result_type)
