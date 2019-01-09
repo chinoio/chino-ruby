@@ -115,7 +115,7 @@ module ChinoRuby
       else
         uri = return_uri(path, limit, offset, full_document)
       end
-      req = Net::HTTP::Post.new(uri.path)
+      req = Net::HTTP::Post.new(uri)
       if @customer_id == "Bearer "
         req.add_field("Authorization", @customer_id+@customer_key)
       else
@@ -616,7 +616,7 @@ module ChinoRuby
   class GetUsersResponse
     include ActiveModel::Serializers::JSON
 
-    attr_accessor :count, :total_count, :limit, :offset, :users
+    attr_accessor :count, :total_count, :limit, :offset, :users, :exists
 
     def attributes=(hash)
       hash.each do |key, value|
@@ -935,7 +935,7 @@ module ChinoRuby
   class GetDocumentsResponse
     include ActiveModel::Serializers::JSON
 
-    attr_accessor :count, :total_count, :limit, :offset, :documents
+    attr_accessor :count, :total_count, :limit, :offset, :documents, :IDs
 
     def attributes=(hash)
       hash.each do |key, value|
@@ -1384,20 +1384,22 @@ module ChinoRuby
       check_string(result_type)
       check_json(sort)
       check_json(query)
-      data = {"result_type": result_type, "query": query, "sort": sort}.to_json
+      data = { result_type: result_type, query: query, sort: sort}.to_json
+
       docs = GetDocumentsResponse.new
-      if limit==nil && offset==nil
-        docs.from_json(post_resource("/search/documents/#{schema_id}", data, ChinoRuby::QUERY_DEFAULT_LIMIT, 0).to_json)
-      else
-        docs.from_json(post_resource("/search/documents/#{schema_id}", data, limit, offset).to_json)
+      docs.from_json(post_resource("/search/documents/#{schema_id}", data, limit || ChinoRuby::QUERY_DEFAULT_LIMIT, offset || 0).to_json)
+
+      case result_type
+      when 'ONLY_ID'
+        docs.IDs = docs.IDs.map { |id| id }
+
+      when 'FULL_CONTENT', 'NO_CONTENT'
+        docs.documents = docs.documents.map do |d|
+          doc = Document.new
+          doc.from_json(d.to_json)
+        end
       end
-      ds = docs.documents
-      docs.documents = []
-      ds.each do |d|
-        doc = Document.new
-        doc.from_json(d.to_json)
-        docs.documents.push(doc)
-      end
+
       docs
     end
 
