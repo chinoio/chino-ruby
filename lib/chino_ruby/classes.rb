@@ -58,12 +58,9 @@ module ChinoRuby
 # Base class of every resource class. It contains the functions for the GET, POST, PUT, PATCH and DELETE requests
   class ChinoBaseAPI < CheckValues
 
-    # Used to inizialize a customer or a user. If you want to authenticate a user, simply pass "" as the customer_id
+    # Used to inizialize a customer or a user. If you want to authenticate a user, simply pass nil as the customer_id
     def initialize(customer_id, customer_key, host_url)
-      if customer_id == ""
-        @customer_id = "Bearer "
-      end
-      @customer_id = customer_id
+      @customer_id = customer_id.blank? ? "Bearer " : customer_id
       @customer_key = customer_key
       @host_url = host_url
     end
