@@ -1476,8 +1476,7 @@ module ChinoRuby
 
   class Blobs < ChinoBaseAPI
 
-    def upload_blob(path, filename, document_id, field)
-      chunk_size = 1024*32
+    def upload_blob(path, filename, document_id, field, chunk_size = 1024*32)
       check_string(path)
       check_string(document_id)
       check_string(field)
@@ -1487,7 +1486,8 @@ module ChinoRuby
       bytes = []
       offset = 0
       #FIXME: this is relative to the LIBRARY directory, not running app
-      file_path = File.join File.expand_path("../..", File.dirname(__FILE__)), path, filename
+      # file_path = File.join File.expand_path("../..", File.dirname(__FILE__)), path, filename
+      file_path = File.join path, filename
       File.open(file_path, 'rb') { |file|
         while (buffer = file.read(chunk_size)) do
           upload_chunk(blob.upload_id, buffer, offset)
@@ -1501,7 +1501,7 @@ module ChinoRuby
       check_string(filename)
       check_string(document_id)
       check_string(field)
-      data = {"file_name": filename, "document_id": document_id, "field": field}.to_json
+      data = { file_name: filename, document_id: document_id, field: field }.to_json
       blob = InitBlobResponse.new
       blob.from_json(ActiveSupport::JSON.decode(post_resource("/blobs", data).to_json)['blob'].to_json)
       blob
@@ -1529,7 +1529,7 @@ module ChinoRuby
 
     def commit_upload(upload_id)
       check_string(upload_id)
-      data = {"upload_id": upload_id}.to_json
+      data = { upload_id: upload_id }.to_json
       blob = Blob.new
       blob.from_json(post_resource("/blobs/commit", data).to_json, true)
       blob
