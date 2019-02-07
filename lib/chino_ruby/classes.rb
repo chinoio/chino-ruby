@@ -58,12 +58,9 @@ module ChinoRuby
 # Base class of every resource class. It contains the functions for the GET, POST, PUT, PATCH and DELETE requests
   class ChinoBaseAPI < CheckValues
 
-    # Used to inizialize a customer or a user. If you want to authenticate a user, simply pass "" as the customer_id
+    # Used to inizialize a customer or a user. If you want to authenticate a user, simply pass nil as the customer_id
     def initialize(customer_id, customer_key, host_url)
-      if customer_id == ""
-        @customer_id = "Bearer "
-      end
-      @customer_id = customer_id
+      @customer_id = customer_id.blank? ? "Bearer " : customer_id
       @customer_key = customer_key
       @host_url = host_url
     end
@@ -115,7 +112,7 @@ module ChinoRuby
       else
         uri = return_uri(path, limit, offset, full_document)
       end
-      req = Net::HTTP::Post.new(uri.path)
+      req = Net::HTTP::Post.new(uri)
       if @customer_id == "Bearer "
         req.add_field("Authorization", @customer_id+@customer_key)
       else
@@ -616,7 +613,7 @@ module ChinoRuby
   class GetUsersResponse
     include ActiveModel::Serializers::JSON
 
-    attr_accessor :count, :total_count, :limit, :offset, :users
+    attr_accessor :count, :total_count, :limit, :offset, :users, :exists
 
     def attributes=(hash)
       hash.each do |key, value|
@@ -935,7 +932,7 @@ module ChinoRuby
   class GetDocumentsResponse
     include ActiveModel::Serializers::JSON
 
-    attr_accessor :count, :total_count, :limit, :offset, :documents
+    attr_accessor :count, :total_count, :limit, :offset, :documents, :IDs
 
     def attributes=(hash)
       hash.each do |key, value|
@@ -1342,6 +1339,67 @@ module ChinoRuby
       docs
     end
 
+    ##
+    # Document complex search accept a query hash, has documented here https://docs.chino.io/#header-complex-search
+    # query hash need to be converted to json
+    # e.g. to build this JSON query
+    # {
+    #   "and": [
+    #       {
+    #           "field": "user_id",
+    #           "type": "eq",
+    #           "value": "aaaaaaa"
+    #       },
+    #       {
+    #           "or": [
+    #               {
+    #                   "field": "first_name",
+    #                   "type": "like",
+    #                   "value": "*Mario*"
+    #               },
+    #               {
+    #                   "field": "last_name",
+    #                   "type": "like",
+    #                   "value": "*Mario*"
+    #               }
+    #           ]
+    #       }
+    #   ]
+    # }
+    #
+    # You can use code like this:
+    #
+    # query = { and: [] }
+    # query[:and] << ChinoFilterOption.new('user_id', 'eq', "aaaaaaa")
+    #
+    # or_conditions = { or: [] }
+    # or_conditions[:or] << ChinoFilterOption.new('first_name', 'like', "*Mario*")
+    # or_conditions[:or] << ChinoFilterOption.new('last_name', 'like', "*Mario*")
+    # query[:and] << or_conditions
+    def complex_search_documents(schema_id, result_type, sort, query, limit=nil, offset=nil)
+      check_string(schema_id)
+      check_string(result_type)
+      check_json(sort)
+      check_json(query)
+      data = { result_type: result_type, query: query, sort: sort}.to_json
+
+      docs = GetDocumentsResponse.new
+      docs.from_json(post_resource("/search/documents/#{schema_id}", data, limit || ChinoRuby::QUERY_DEFAULT_LIMIT, offset || 0).to_json)
+
+      case result_type
+      when 'ONLY_ID'
+        docs.IDs = docs.IDs.map { |id| id }
+
+      when 'FULL_CONTENT', 'NO_CONTENT'
+        docs.documents = docs.documents.map do |d|
+          doc = Document.new
+          doc.from_json(d.to_json)
+        end
+      end
+
+      docs
+    end
+
     def search_users(user_schema_id, result_type, filter_type, sort, filter, limit=nil, offset=nil)
       check_string(user_schema_id)
       check_string(result_type)
@@ -1418,8 +1476,7 @@ module ChinoRuby
 
   class Blobs < ChinoBaseAPI
 
-    def upload_blob(path, filename, document_id, field)
-      chunk_size = 1024*32
+    def upload_blob(path, filename, document_id, field, chunk_size = 1024*32)
       check_string(path)
       check_string(document_id)
       check_string(field)
@@ -1429,7 +1486,8 @@ module ChinoRuby
       bytes = []
       offset = 0
       #FIXME: this is relative to the LIBRARY directory, not running app
-      file_path = File.join File.expand_path("../..", File.dirname(__FILE__)), path, filename
+      # file_path = File.join File.expand_path("../..", File.dirname(__FILE__)), path, filename
+      file_path = File.join path, filename
       File.open(file_path, 'rb') { |file|
         while (buffer = file.read(chunk_size)) do
           upload_chunk(blob.upload_id, buffer, offset)
@@ -1443,7 +1501,7 @@ module ChinoRuby
       check_string(filename)
       check_string(document_id)
       check_string(field)
-      data = {"file_name": filename, "document_id": document_id, "field": field}.to_json
+      data = { file_name: filename, document_id: document_id, field: field }.to_json
       blob = InitBlobResponse.new
       blob.from_json(ActiveSupport::JSON.decode(post_resource("/blobs", data).to_json)['blob'].to_json)
       blob
@@ -1471,7 +1529,7 @@ module ChinoRuby
 
     def commit_upload(upload_id)
       check_string(upload_id)
-      data = {"upload_id": upload_id}.to_json
+      data = { upload_id: upload_id }.to_json
       blob = Blob.new
       blob.from_json(post_resource("/blobs/commit", data).to_json, true)
       blob
@@ -1495,8 +1553,9 @@ module ChinoRuby
       filename = res.header['Content-Disposition'].partition('=').last
       blob.filename = filename
       blob.path = destination
-      #FIXME: this is relative to the LIBRARY directory, not running app
-      file_path = File.join File.expand_path("../..", File.dirname(__FILE__)), destination
+      # FIXME: this is relative to the LIBRARY directory, not running app
+      # file_path = File.join File.expand_path("../..", File.dirname(__FILE__)), destination
+      file_path = File.join Dir.pwd, destination
       FileUtils.mkdir_p(file_path) unless File.exist?(file_path)
       File.open(File.join(file_path+filename), 'wb') { |file|
         file << res.body

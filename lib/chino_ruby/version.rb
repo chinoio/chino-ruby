@@ -1,3 +1,3 @@
 module ChinoRuby
-  VERSION = "2.0"
+  VERSION = '2.3'.freeze
 end
