@@ -684,7 +684,7 @@ module ChinoRuby
     def update_user_partial(user_id, attributes)
       check_string(user_id)
       check_json(attributes)
-      data = {"attributes": attributes}.to_json
+      data = attributes.to_json
       user = User.new
       user.from_json(patch_resource("/users/#{user_id}", data).to_json, true)
       user
