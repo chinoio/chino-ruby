@@ -1,0 +1,149 @@
+AllCops:
+  TargetRubyVersion:
+    '2.2.3'
+  Include:
+    - Rakefile
+    - config.ru
+    - lib/**/*.rake
+  Exclude:
+    - db/schema.rb
+    - db/migrate/*.*
+    - Gemfile
+    - Capfile
+    - tmp/**/*.*
+
+Bundler/OrderedGems:
+  Enabled: false
+
+Style/AsciiComments:
+  Enabled: false
+
+Style/RedundantSelf:
+  Enabled: false
+
+Style/RedundantReturn:
+  Enabled: false
+
+Style/Documentation:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  Enabled: false
+
+Style/SafeNavigation:
+  Enabled: false
+
+Style/GuardClause:
+  Enabled: false
+
+Style/NumericPredicate:
+  Enabled: false
+
+Style/NegatedIf:
+  Enabled: false
+
+Style/SymbolArray:
+  EnforcedStyle: brackets
+
+Style/WordArray:
+  EnforcedStyle: brackets
+
+Style/MethodDefParentheses:
+  Enabled: false
+
+Style/RescueModifier:
+  Enabled: false
+
+Style/BlockDelimiters:
+  Enabled: false
+
+Style/WordArray:
+  Enabled: false
+
+Style/SymbolArray:
+  Enabled: false
+
+Style/ConditionalAssignment:
+  Enabled: false
+
+Style/SingleLineMethods:
+  Enabled: false
+
+Style/Next:
+  Enabled: false
+
+Metrics/LineLength:
+  Enabled: false
+  Max: 80
+
+Metrics/ClassLength:
+  Max: 1000
+
+Metrics/ModuleLength:
+  Max: 1000
+
+Metrics/MethodLength:
+  Max: 100
+
+Metrics/AbcSize:
+  Enabled: false
+
+Metrics/CyclomaticComplexity:
+  Max: 15
+
+Metrics/PerceivedComplexity:
+  Max: 20
+
+Metrics/BlockLength:
+  Max: 100
+
+# SupportedStyles: empty_lines, no_empty_lines
+Layout/EmptyLinesAroundBlockBody:
+  EnforcedStyle: no_empty_lines
+
+# SupportedStyles: empty_lines, empty_lines_except_namespace, empty_lines_special, no_empty_lines
+Layout/EmptyLinesAroundClassBody:
+  EnforcedStyle: no_empty_lines
+
+# # SupportedStyles: empty_lines, empty_lines_except_namespace, empty_lines_special, no_empty_lines
+# Layout/EmptyLinesAroundModuleBody:
+#   Enabled: false
+
+# Configuration parameters: SupportedStyles, IndentationWidth.
+# SupportedStyles: special_inside_parentheses, consistent, align_brackets
+Layout/IndentArray:
+  EnforcedStyle: consistent
+
+# # Configuration parameters: AllowAdjacentOneLineDefs, NumberOfEmptyLines.
+# Layout/EmptyLineBetweenDefs:
+#   Enabled: false
+
+# # Configuration parameters: AllowForAlignment, ForceEqualSignAlignment.
+# Layout/ExtraSpacing:
+#   Enabled: false
+
+Layout/IndentHash:
+  EnforcedStyle: consistent
+
+Layout/IndentationConsistency:
+  EnforcedStyle: rails
+
+Layout/LeadingCommentSpace:
+  Enabled: false
+
+Layout/MultilineMethodCallIndentation:
+  EnforcedStyle: indented
+
+Layout/MultilineOperationIndentation:
+  EnforcedStyle: indented
+
+Layout/AlignParameters:
+  Enabled: false
+
+# http://ruby-doc.org/core-2.4.0/String.html#method-i-casecmp-3F
+# twice as fast but harder to read
+Performance/Casecmp:
+  Enabled: false
+
+Lint/NonLocalExitFromIterator:
+  Enabled: false
